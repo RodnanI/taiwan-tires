@@ -145,6 +145,89 @@ const GENERATORS = {
     }
     return { map: tex(c) };
   },
+  // lamp lens optics (normal maps): pillow cells, horizontal ribs, vertical flutes
+  lensOptic(n) {
+    const h = new Float32Array(n * n), cells = 16;
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const u = ((x / n) * cells) % 1, v = ((y / n) * cells) % 1;
+      h[y * n + x] = Math.sin(u * Math.PI) * Math.sin(v * Math.PI);
+    }
+    const c = makeCanvas(n, n); c.getContext('2d').fillStyle = '#fff'; c.getContext('2d').fillRect(0, 0, n, n);
+    return { map: tex(c), normalMap: normalFromHeight(h, n, 5) };
+  },
+  lensRibs(n) {
+    const h = new Float32Array(n * n), ribs = 24;
+    for (let y = 0; y < n; y++) { const v = ((y / n) * ribs) % 1; const k = Math.sin(v * Math.PI); for (let x = 0; x < n; x++) h[y * n + x] = k; }
+    const c = makeCanvas(n, n); c.getContext('2d').fillStyle = '#fff'; c.getContext('2d').fillRect(0, 0, n, n);
+    return { map: tex(c), normalMap: normalFromHeight(h, n, 6) };
+  },
+  lensFlutes(n) {
+    const h = new Float32Array(n * n), fl = 20;
+    for (let x = 0; x < n; x++) { const u = ((x / n) * fl) % 1; const k = Math.sin(u * Math.PI); for (let y = 0; y < n; y++) h[y * n + x] = k; }
+    const c = makeCanvas(n, n); c.getContext('2d').fillStyle = '#fff'; c.getContext('2d').fillRect(0, 0, n, n);
+    return { map: tex(c), normalMap: normalFromHeight(h, n, 4) };
+  },
+  // fine moulded-plastic / vinyl grain (bumpers, dashboards, door cards)
+  grain(n) {
+    const f = noiseField(n, 64, 3, 21);
+    const c = fromField(n, (x, y) => { const v = 225 + f[y * n + x] * 30; return [v, v, v]; });
+    return { map: tex(c), normalMap: normalFromHeight(f, n, 3.5) };
+  },
+  // ---- interior fabrics and trims (map colours are multiplied by the material colour: use white for patterned ones)
+  cloth80s(n) {
+    // charcoal tweed with thin warm pinstripes every few millimetres
+    const f = noiseField(n, 128, 2, 31), w = noiseField(n, 256, 1, 32);
+    const c = fromField(n, (x, y) => {
+      const k = 52 + f[y * n + x] * 26 + ((x + y) % 4 < 2 ? 6 : -4);
+      const stripe = (y % (n / 8)) < n / 160 ? 1 : (y % (n / 8)) > n / 16 && (y % (n / 8)) < n / 16 + n / 256 ? 0.6 : 0;
+      return [k + stripe * 150, k + stripe * 72, k * 1.04 + stripe * 24];
+    });
+    return { map: tex(c), normalMap: normalFromHeight(w, n, 4) };
+  },
+  carpet(n) {
+    const f = noiseField(n, 160, 2, 33);
+    const c = fromField(n, (x, y) => { const v = 175 + f[y * n + x] * 80; return [v, v, v]; });
+    return { map: tex(c), normalMap: normalFromHeight(f, n, 7) };
+  },
+  headliner(n) {
+    // light perforated vinyl: tiny dots on a soft grain
+    const f = noiseField(n, 48, 3, 34);
+    const step = Math.max(4, Math.round(n / 64));
+    const c = fromField(n, (x, y) => { const hole = (x % step) < step * 0.28 && (y % step) < step * 0.28; const v = hole ? 150 : 228 + f[y * n + x] * 20; return [v, v, v * 0.98]; });
+    const h = new Float32Array(n * n); for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) h[y * n + x] = ((x % step) < step * 0.28 && (y % step) < step * 0.28) ? 0 : 1;
+    return { map: tex(c), normalMap: normalFromHeight(h, n, 1.2) };
+  },
+  alcantara(n) {
+    const f = noiseField(n, 200, 2, 35), g2 = noiseField(n, 20, 2, 36);
+    const c = fromField(n, (x, y) => { const v = 200 + f[y * n + x] * 30 + g2[y * n + x] * 25; return [v, v, v]; });
+    return { map: tex(c), normalMap: normalFromHeight(f, n, 1.5) };
+  },
+  perforated(n) {
+    // leather with a perforation grid (seat centres)
+    const f = noiseField(n, 90, 2, 37);
+    const step = Math.max(6, Math.round(n / 40));
+    const c = fromField(n, (x, y) => { const dx = (x % step) - step / 2, dy = (y % step) - step / 2; const hole = dx * dx + dy * dy < (step * 0.16) ** 2; const v = hole ? 40 : 205 + f[y * n + x] * 45; return [v, v, v]; });
+    return { map: tex(c), normalMap: normalFromHeight(f, n, 6) };
+  },
+  quilted(n) {
+    // diamond quilting with stitch lines (luxury seat centres)
+    const f = noiseField(n, 90, 2, 38);
+    const h = new Float32Array(n * n);
+    const k = 4;
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const u = ((x + y) / n) * k, v = ((x - y + n) / n) * k;
+      const du = Math.abs((u % 1) - 0.5), dv = Math.abs((v % 1) - 0.5);
+      h[y * n + x] = Math.min(1, Math.min(0.5 - du, 0.5 - dv) * 6) * 0.9 + f[y * n + x] * 0.1;
+    }
+    const c = fromField(n, (x, y) => { const v = 150 + h[y * n + x] * 80 + f[y * n + x] * 20; return [v, v, v]; });
+    return { map: tex(c), normalMap: normalFromHeight(h, n, 5) };
+  },
+  speaker(n) {
+    // speaker grille: dense hole pattern
+    const step = Math.max(4, Math.round(n / 48));
+    const c = fromField(n, (x, y) => { const dx = (x % step) - step / 2, dy = ((y + (Math.floor(x / step) % 2) * step / 2) % step) - step / 2; const hole = dx * dx + dy * dy < (step * 0.3) ** 2; const v = hole ? 10 : 70; return [v, v, v]; });
+    return { map: tex(c) };
+  },
   brushed(n) {
     const c = fromField(n, (x, y) => { const v = 150 + hash2(y, 3) * 60 + valueNoise(x / 40, y) * 20; return [v, v, v]; });
     return { map: tex(c) };

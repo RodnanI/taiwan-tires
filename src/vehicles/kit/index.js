@@ -7,6 +7,7 @@ import { buildWheel, RIM_STYLES } from './wheels.js';
 import { makeInterior } from './interior.js';
 import { makeExterior } from './exterior.js';
 import { makePresets } from './presets.js';
+import { makeBodyKit } from './body.js';
 
 export { RIM_STYLES };
 
@@ -38,7 +39,15 @@ export function createVehicleKit({ M, spec, visual, detail = 1, accent = '#ff9a2
     paint2: null,
     /** Wheels: call to override the default wheels (built from spec + visual.mods.rims). */
     wheels(opts) { kit._wheelOverride = opts; },
-    buildWheel: (o) => buildWheel({ detail, ...o }, M),
+    // front and rear pairs share their build (the runtime asks once per wheel)
+    buildWheel: (o) => {
+      const key = JSON.stringify(o);
+      const c = (kit._wheelCache ||= new Map()).get(key);
+      if (c) return { ...c, spin: c.spin.clone(), hub: c.hub.clone() };
+      const w = buildWheel({ detail, ...o }, M);
+      kit._wheelCache.set(key, w);
+      return w;
+    },
   };
   kit.paint = M.paint(visual?.paint?.color, visual?.paint?.finish);
   kit.paint2 = visual?.paint2 ? M.paint(visual.paint2.color, visual.paint2.finish) : kit.paint;
@@ -51,6 +60,7 @@ export function createVehicleKit({ M, spec, visual, detail = 1, accent = '#ff9a2
   kit.interior = makeInterior(kit);
   kit.ext = makeExterior(kit);
   kit.presets = makePresets(kit);
+  kit.body = makeBodyKit(kit);
   return kit;
 }
 
