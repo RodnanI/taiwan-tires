@@ -16,7 +16,7 @@ export function buildCabin(ctx, ex) {
   const dashMat = I.mat('grain', { color: 0x1f2022, roughness: 0.78, repeat: 24, normalScale: 0.5 });
   const dashLow = I.mat('grain', { color: 0x3b3d41, roughness: 0.7, repeat: 24, normalScale: 0.5 });
   const vinyl = I.mat('grain', { color: 0x46484c, roughness: 0.6, repeat: 30, normalScale: 0.7 });
-  const pillarMat = I.mat('grain', { color: 0x5a5c60, roughness: 0.7, repeat: 30, normalScale: 0.4 });
+  const pillarMat = I.mat('grain', { color: 0x3c3e42, roughness: 0.75, repeat: 30, normalScale: 0.4 });
   const cloth = I.mat('cloth80s', { color: 0xffffff, roughness: 0.95, repeat: 7 });
   const headliner = I.mat('headliner', { color: 0xc9c5bb, roughness: 0.9, repeat: 14 });
   const carpet = I.mat('carpet', { color: 0x2a2a2d, roughness: 1, repeat: 9 });
@@ -120,6 +120,16 @@ export function buildCabin(ctx, ex) {
       g.add(pod);
       for (let k = 0; k < 2; k++) { const sw = new THREE.Mesh(kit.geo.roundedBox(0.03, 0.012, 0.012, 0.003, 1), M.shared('kz:switch', () => M.surface({ color: 0x2b2c2f, roughness: 0.4 }))); sw.position.set(sx, 0.875 - k * 0.022, 0.232); g.add(sw); }
     }
+    // dash-top speaker grilles and the windscreen demister slot
+    const spkM = I.mat('speaker', { color: 0xffffff, roughness: 0.7, repeat: 6 });
+    for (const sx of [1, -1]) {
+      const sp = new THREE.Mesh(kit.geo.roundedBox(0.16, 0.004, 0.07, 0.012, 2), spkM);
+      sp.position.set(sx * 0.56, 0.889, 0.47); sp.rotation.x = -0.03;
+      g.add(sp);
+    }
+    const demist = new THREE.Mesh(kit.geo.roundedBox(0.7, 0.004, 0.022, 0.008, 2), M.shared('kz:recess', () => M.surface({ color: 0x0b0b0c, roughness: 0.9 })));
+    demist.position.set(-0.05, 0.888, 0.53);
+    g.add(demist);
     // outer vents (round, 80s) at both dash ends, square vents in the centre stack
     for (const sx of [1, -1]) g.add(I.vent({ pos: [sx * 0.635, 0.815, 0.268], size: [0.085, 0.085], round: true, rot: [0, sx * 0.25, 0] }));
   }
@@ -135,7 +145,7 @@ export function buildCabin(ctx, ex) {
     const lean = Math.atan2(0.282 - 0.262, 0.85 - 0.52);
     const faceZ = (y) => 0.262 + (y - 0.52) * Math.tan(lean);
     // square vents above the radio
-    for (const sx of [1, -1]) g.add(I.vent({ pos: [sx * 0.056, 0.815, faceZ(0.815) - 0.004], size: [0.092, 0.05], rot: [-lean, Math.PI, 0] }));
+    for (const sx of [1, -1]) g.add(I.vent({ pos: [sx * 0.058, 0.818, 0.259], size: [0.094, 0.05], rot: [0, Math.PI, 0] }));
     // aftermarket double-DIN unit (the menu is projected onto its screen)
     g.add(I.headUnit({ pos: [0, 0.715, faceZ(0.715) - 0.01], size: [0.16, 0.09], tilt: lean / (Math.PI / 180) + 4, style: 'doubleDin', bezel: 0.009 }));
     // HVAC: three sliders on a lit strip and a fan knob
@@ -157,7 +167,7 @@ export function buildCabin(ctx, ex) {
     for (let i = 0; i <= 10; i++) con.push([0, 0, 0.3 - (0.92 * i) / 10]);
     const conP = B.sweep(con, (s) => { const top = 0.44 - 0.03 * s, w = 0.1 - 0.012 * s; return [[-w, 0.3], [-w, top - 0.02], [-w + 0.02, top], [w - 0.02, top], [w, top - 0.02], [w, 0.3]]; }, { up: [0, 1, 0], capEnd: true });
     g.add(B.mesh([conP], M.shared('kz:console', () => M.surface({ color: 0x1e1f21, roughness: 0.62 })), { name: 'console' }));
-    g.add(I.shifter2({ pos: [0, 0.43, -0.02], gears: 5, knob: 'ball', lean: 0.18, boot: M.leather(0x161616) }));
+    g.add(I.shifter2({ pos: [0, 0.43, -0.02], gears: 5, knob: 'ball', lean: 0.18, boot: I.leather(0x161616, 0.65) }));
     g.add(I.handbrake({ pos: [0, 0.415, -0.36], hydro: parts.handbrake === 'hydro' }));
     const tray = new THREE.Mesh(kit.geo.roundedBox(0.12, 0.01, 0.1, 0.004, 1), M.shared('kz:tray', () => M.surface({ color: 0x0c0c0d, roughness: 0.9 })));
     tray.position.set(0, 0.442, 0.17);
@@ -176,7 +186,7 @@ export function buildCabin(ctx, ex) {
 
   // ------------------------------------------------------------------ seats
   const seatOpts = cage
-    ? { w: 0.52, len: 0.5, h: 0.12, back: 0.62, recline: 15, bolster: 0.07, backBolster: 0.12, headrest: 'integrated', harness: true, insert: I.mat('alcantara', { color: 0x1a1a1c, repeat: 6 }), side: M.leather(0x121213) }
+    ? { w: 0.52, len: 0.5, h: 0.12, back: 0.62, recline: 15, bolster: 0.07, backBolster: 0.12, headrest: 'integrated', harness: true, insert: I.mat('alcantara', { color: 0x1a1a1c, repeat: 6 }), side: I.leather(0x121213) }
     : { w: 0.5, len: 0.5, h: 0.125, back: 0.6, recline: 17, bolster: 0.035, backBolster: 0.07, headrest: 'separate', insert: cloth, side: vinyl };
   for (const sx of [1, -1]) {
     if (gutted && sx < 0 && !cage) continue;

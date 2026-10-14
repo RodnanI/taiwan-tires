@@ -5,7 +5,7 @@
 //   headUnit      -> anchors.screen (the menu is mapped onto it) + in-game display canvas
 import * as THREE from 'three';
 import { roundedBox, tube, extrude, place, merge, latheZ, box, cylinderX, cylinderZ } from './geometry.js';
-import { loftBody, sweep, warp, toGeometry, fromGeometry, mergePatches, split, clip, roll, offset } from './body.js';
+import { loftBody, sweep, warp, toGeometry, fromGeometry, mergePatches, split, clip, roll, offset, boxUV } from './body.js';
 import { getTextureSet } from '../../render/textures.js';
 import { makeCanvas, FONT_UI } from '../../core/canvas.js';
 import { canvasTexture } from '../../render/textures.js';
@@ -120,10 +120,11 @@ export function makeInterior(kit) {
     g.position.set(...pos);
     g.rotation.set(-tilt * D2R, Math.PI + yaw * D2R, 0, 'YXZ');
     const [w, h] = size;
-    const frame = new THREE.Mesh(roundedBox(w + bezel * 2, h + bezel * 2, style === 'doubleDin' ? 0.1 : 0.022, 0.008, 2), M.plastic(0x0d0d0f, 0.35));
-    frame.position.z = -0.012;
+    const depth = style === 'doubleDin' ? 0.1 : 0.022;
+    const frame = new THREE.Mesh(roundedBox(w + bezel * 2, h + bezel * 2, depth, 0.006, 2), M.plastic(0x0d0d0f, 0.35));
+    frame.position.z = -depth / 2 - 0.0005; // front face flush behind the screen
     g.add(frame);
-    const canvas = makeCanvas(512, Math.round(512 * h / w));
+    const canvas = makeCanvas(768, Math.round(768 * h / w));
     const tex = canvasTexture(canvas, { repeat: false });
     const screenMat = M.surface({ color: 0x000000, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 1, roughness: 0.08, metalness: 0.0 });
     const screen = new THREE.Mesh(new THREE.PlaneGeometry(w, h), screenMat);
@@ -136,6 +137,10 @@ export function makeInterior(kit) {
       g.add(stem);
     }
     kit._screen = { group: g, mesh: screen, width: w, height: h, canvas, texture: tex };
+    // in-game display (the menu UI covers it while menus are open)
+    const st = { canvas, tex, last: -1e9, accent: kit.accent };
+    kit._gauges.push({ update: (tel, now) => drawHeadUnit(st, tel, now) });
+    drawHeadUnit(st, { rpm: 0 }, 0, true);
     return g;
   };
 
@@ -199,6 +204,8 @@ export function makeInterior(kit) {
     if (m.normalScale) m.normalScale.set(normalScale, normalScale);
     return m;
   });
+  /** Fine-grain leather (the stock leather map is too coarse for close-up trim). */
+  I.leather = (color, roughness = 0.5) => I.mat('grain', { color, roughness, repeat: 46, normalScale: 0.35 });
   /** Metric uvs on a patch (planar projection on the dominant axis per triangle is overkill: one axis is enough). */
   const uvProject = (p, axis, scale = 1) => {
     const v = p.v, [a, b] = axis === 'x' ? [2, 1] : axis === 'y' ? [0, 2] : [0, 1];
@@ -227,8 +234,8 @@ export function makeInterior(kit) {
     // insert (centre) vs bolsters, separated by a stitched seam
     const fIns = (x, y) => Math.max(Math.abs(x) - (hw - 0.1), h - 0.03 - y);
     let [cIns, cSide] = split(cush, fIns, 0.002);
-    g.add(meshOf([uvProject(cIns, 'y', 1), roll(cIns, { r: 0.002, depth: 0.004 })], insert));
-    g.add(meshOf([uvProject(cSide, 'y', 1), roll(cSide, { r: 0.002, depth: 0.004 })], side));
+    g.add(meshOf([boxUV(mergePatches([cIns, roll(cIns, { r: 0.002, depth: 0.004 })]))], insert));
+    g.add(meshOf([boxUV(mergePatches([cSide, roll(cSide, { r: 0.002, depth: 0.004 })]))], side));
     // ---- backrest: lofted along its height in a local frame (x, t = forward, z = up), then reclined
     const bt = o.thick ?? 0.12;
     const bs = (z, bz, wz = 1, tz = 1) => ({ z, pts: [[0, -bt * 0.55 * tz, 0.03], [hw * wz - 0.04, -bt * 0.5 * tz, 0.04], [hw * wz, 0, 0.035], [hw * wz - 0.04, bz, 0.035], [hw * wz - 0.11, 0.012, 0.02], [0, 0.02, 0.5]] });
@@ -250,8 +257,8 @@ export function makeInterior(kit) {
     };
     const bI = fixN(toWorld(mergePatches([bIns, roll(bIns, { r: 0.002, depth: 0.004 })])));
     const bS = fixN(toWorld(mergePatches([bSide, roll(bSide, { r: 0.002, depth: 0.004 })])));
-    g.add(meshOf([uvProject(bI, 'z', 1)], insert));
-    g.add(meshOf([uvProject(bS, 'x', 1)], side));
+    g.add(meshOf([boxUV(bI)], insert));
+    g.add(meshOf([boxUV(bS)], side));
     if (o.harness && integrated) {
       for (const sx of [1, -1]) { const slot = new THREE.Mesh(roundedBox(0.05, 0.012, 0.09, 0.005, 1), M.plastic(0x050505, 0.8)); const p = place2(sx * 0.085, 0.0, H + 0.02); slot.position.set(...p); slot.rotation.x = -rec + Math.PI / 2; g.add(slot); }
     }
@@ -261,7 +268,7 @@ export function makeInterior(kit) {
         { fillet: [2, 3, 3, 3, 3], seg: [2, 1, 1, 2], rows: 10, capRear: { dome: 0.02, rings: 4 }, capFront: { dome: 0.03, rings: 4 } }).patch;
       // local loft: x lateral, y = forward, z = up; place above the backrest top
       const hrW = warp(hr, (x, y, z) => place2(-x, y + 0.005, H + 0.17 + z), true);
-      g.add(meshOf([hrW], side));
+      g.add(meshOf([boxUV(hrW)], side));
       for (const sx of [1, -1]) { const post = new THREE.Mesh(cylinderZ(0.0055, 0.16, 8), M.chrome()); const p = place2(sx * 0.07, -0.01, H + 0.04); post.position.set(...p); post.rotation.x = -rec + Math.PI / 2; g.add(post); }
     }
     // back shell (sport seats) and base: rails, side covers, recline lever
@@ -299,7 +306,7 @@ export function makeInterior(kit) {
     const wheel = new THREE.Group();
     flipG.add(wheel);
     const R = o.radius ?? 0.185, style = o.style ?? 'sport3';
-    const grip = o.grip ?? M.leather(0x151515), spokeM = o.spoke ?? M.plastic(0x1a1a1c, 0.45), padM = o.pad ?? M.plastic(0x141416, 0.6);
+    const grip = o.grip ?? I.leather(0x151515), spokeM = o.spoke ?? M.plastic(0x1a1a1c, 0.45), padM = o.pad ?? M.plastic(0x141416, 0.6);
     // rim: sweep around a circle (flattened at the bottom for 'flat'), thicker at 10 and 2 o'clock
     const n = Math.max(32, Math.round(72 * kit.detail));
     const path = [];
@@ -311,7 +318,7 @@ export function makeInterior(kit) {
     }
     const thick = (s) => { const a = s * Math.PI * 2; return 1 + 0.12 * Math.max(0, Math.cos(2 * (a - Math.PI / 2)) * (Math.sin(a) > 0 ? 1 : 0.2)); };
     const rimP = sweep(path, (s) => { const k = thick(s); const rr = 0.0145 * k, rz = 0.018 * k; const pts = []; for (let j = 0; j < 10; j++) { const t = (j / 10) * Math.PI * 2; pts.push([Math.cos(t) * rr, Math.sin(t) * rz]); } return pts; }, { closed: true, up: [0, 0, 1], profileClosed: true });
-    wheel.add(meshOf([rimP], grip));
+    wheel.add(meshOf([boxUV(rimP)], grip));
     if (o.accent) { const mk = new THREE.Mesh(roundedBox(0.014, 0.034, 0.038, 0.004, 1), o.accent); mk.position.set(0, R, 0); wheel.add(mk); }
     // spokes: swept flat ovals from the hub to the rim (dished: hub sits back)
     const dish = style === '80s3' ? 0.045 : style === 'flat' ? 0.012 : 0.03;
@@ -399,7 +406,7 @@ export function makeInterior(kit) {
   I.shifter2 = ({ pos = [0, 0.45, 0], type = 'h', knob = 'ball', gears = 5, lean = 0.12, boot = null, knobMat = null } = {}) => {
     const g = new THREE.Group();
     g.position.set(...pos);
-    const bootM = boot ?? M.leather(0x141414);
+    const bootM = boot ?? I.leather(0x141414, 0.65);
     const gaiter = new THREE.Mesh(latheZ([[0.07, 0], [0.06, 0.02], [0.035, 0.06], [0.018, 0.1], [0.012, 0.11]], 18), bootM);
     gaiter.rotation.x = -Math.PI / 2;
     g.add(gaiter);
@@ -407,7 +414,7 @@ export function makeInterior(kit) {
     g.add(new THREE.Mesh(tube([[0, 0.1, 0], [0, top * 0.6, -lean * 0.06], [0, top, -lean * 0.12]], 0.008, 10, 8), M.chrome()));
     let k;
     if (knob === 'ball') k = new THREE.Mesh(new THREE.SphereGeometry(0.024, 20, 14), knobMat ?? M.surface({ color: 0x111111, roughness: 0.3, metalness: 0.2 }));
-    else if (knob === 'tall') k = new THREE.Mesh(latheZ([[0.012, -0.03], [0.02, -0.02], [0.022, 0.02], [0.016, 0.035], [0, 0.04]], 18), knobMat ?? M.leather(0x151515));
+    else if (knob === 'tall') k = new THREE.Mesh(latheZ([[0.012, -0.03], [0.02, -0.02], [0.022, 0.02], [0.016, 0.035], [0, 0.04]], 18), knobMat ?? I.leather(0x151515));
     else k = new THREE.Mesh(roundedBox(0.035, 0.07, 0.05, 0.012, 2), knobMat ?? M.plastic(0x1a1a1a, 0.4));
     if (knob === 'tall') k.rotation.x = -Math.PI / 2;
     k.position.set(0, top + 0.016, -lean * 0.12 - 0.004);
@@ -436,7 +443,7 @@ export function makeInterior(kit) {
     const g = new THREE.Group(); g.position.set(...pos);
     if (hydro) {
       const lev = new THREE.Mesh(tube([[0, 0, 0.05], [0, 0.18, 0.0], [0, 0.32, -0.04]], 0.011, 12, 8), M.metal(0xb8babd, 0.25));
-      const grip = new THREE.Mesh(cylinderZ(0.016, 0.1, 12), M.leather(0x101010)); grip.position.set(0, 0.3, -0.035); grip.rotation.x = -1.2;
+      const grip = new THREE.Mesh(cylinderZ(0.016, 0.1, 12), I.leather(0x101010)); grip.position.set(0, 0.3, -0.035); grip.rotation.x = -1.2;
       const base = new THREE.Mesh(roundedBox(0.06, 0.05, 0.12, 0.01, 1), M.metal(0x2a2b2e, 0.4)); base.position.set(0, 0.0, 0.05);
       g.add(lev, grip, base);
     } else {
@@ -470,6 +477,38 @@ export function makeInterior(kit) {
 }
 
 // ---- gauge drawing ---------------------------------------------------------------------------
+/** Head unit while driving: clock, radio card with a live spectrum, trip strip. Redrawn 8 times a second. */
+function drawHeadUnit(st, tel, now, force = false) {
+  if (!force && now - st.last < 125) return;
+  st.last = now;
+  const c = st.canvas, g = c.getContext('2d'), W = c.width, H = c.height, acc = st.accent || '#ff9a2e';
+  const bg = g.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#0b0d10'); bg.addColorStop(1, '#14171c');
+  g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, '0'), mm = String(d.getMinutes()).padStart(2, '0');
+  g.fillStyle = '#e9ecf1'; g.font = `600 ${H * 0.085}px ${FONT_UI}`; g.textAlign = 'left'; g.textBaseline = 'middle';
+  g.fillText(`${hh}:${mm}`, W * 0.04, H * 0.09);
+  g.textAlign = 'right'; g.fillStyle = '#8b93a0'; g.fillText('FM  98.6', W * 0.96, H * 0.09);
+  g.fillStyle = '#1d2128'; g.fillRect(W * 0.04, H * 0.18, W * 0.92, H * 0.55);
+  g.fillStyle = acc; g.fillRect(W * 0.04, H * 0.18, W * 0.012, H * 0.55);
+  g.textAlign = 'left'; g.fillStyle = '#f2f4f7'; g.font = `700 ${H * 0.1}px ${FONT_UI}`;
+  g.fillText('TAIWAN TIRES RADIO', W * 0.08, H * 0.29);
+  g.fillStyle = '#9aa3b0'; g.font = `500 ${H * 0.07}px ${FONT_UI}`;
+  g.fillText('Night drive mix', W * 0.08, H * 0.4);
+  // spectrum bars follow the engine
+  const n = 28, base = Math.min(1, (tel.rpm || 0) / 8000);
+  for (let i = 0; i < n; i++) {
+    const v = 0.15 + 0.85 * Math.abs(Math.sin(now * 0.004 * (1 + i * 0.13) + i * 1.7)) * (0.4 + 0.6 * base);
+    g.fillStyle = i / n < 0.7 ? acc : '#e9ecf1';
+    g.fillRect(W * 0.08 + i * (W * 0.84 / n), H * 0.68 - v * H * 0.2, W * 0.84 / n - 3, v * H * 0.2);
+  }
+  g.fillStyle = '#8b93a0'; g.font = `600 ${H * 0.065}px ${FONT_UI}`; g.textAlign = 'left';
+  g.fillText('TRIP  128.4 km', W * 0.04, H * 0.86);
+  g.textAlign = 'right'; g.fillText('27°C', W * 0.96, H * 0.86);
+  g.textBaseline = 'alphabetic';
+  st.tex.needsUpdate = true;
+}
 function drawCluster(st, tel, now, units = 'kmh', force = false) {
   if (!force && now - st.last < 33) return;
   st.last = now;

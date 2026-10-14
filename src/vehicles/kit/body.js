@@ -67,14 +67,30 @@ export class Patch {
   }
 }
 
-/** BufferGeometry (indexed or not) -> Patch. */
-export function fromGeometry(g) {
+/**
+ * BufferGeometry (indexed or not) -> Patch. Vertices sharing position and normal are welded (spheres and lathes
+ * duplicate their seam and pole vertices), so boundaries are only real open edges.
+ */
+export function fromGeometry(g, { weld = true } = {}) {
   const p = new Patch();
   if (!g.attributes.normal) g.computeVertexNormals();
   const pos = g.attributes.position, n = g.attributes.normal, uv = g.attributes.uv;
-  for (let i = 0; i < pos.count; i++) p.add(pos.getX(i), pos.getY(i), pos.getZ(i), n.getX(i), n.getY(i), n.getZ(i), uv ? uv.getX(i) : 0, uv ? uv.getY(i) : 0);
-  if (g.index) for (let i = 0; i < g.index.count; i++) p.t.push(g.index.getX(i));
-  else for (let i = 0; i < pos.count; i++) p.t.push(i);
+  const map = new Int32Array(pos.count), seen = new Map();
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), nx = n.getX(i), ny = n.getY(i), nz = n.getZ(i);
+    if (weld) {
+      const key = `${Math.round(x * 1e5)},${Math.round(y * 1e5)},${Math.round(z * 1e5)}`;
+      const list = seen.get(key);
+      let hit = -1;
+      if (list) for (const j of list) { const o = j * STRIDE; if (p.v[o + 3] * nx + p.v[o + 4] * ny + p.v[o + 5] * nz > 0.97) { hit = j; break; } }
+      if (hit >= 0) { map[i] = hit; continue; }
+      const id = p.add(x, y, z, nx, ny, nz, uv ? uv.getX(i) : 0, uv ? uv.getY(i) : 0);
+      if (list) list.push(id); else seen.set(key, [id]);
+      map[i] = id;
+    } else map[i] = p.add(x, y, z, nx, ny, nz, uv ? uv.getX(i) : 0, uv ? uv.getY(i) : 0);
+  }
+  if (g.index) for (let i = 0; i < g.index.count; i += 3) { const a = map[g.index.getX(i)], b = map[g.index.getX(i + 1)], c = map[g.index.getX(i + 2)]; if (a !== b && b !== c && a !== c) p.t.push(a, b, c); }
+  else for (let i = 0; i < pos.count; i += 3) { const a = map[i], b = map[i + 1], c = map[i + 2]; if (a !== b && b !== c && a !== c) p.t.push(a, b, c); }
   return p;
 }
 
@@ -223,6 +239,23 @@ export function projectUV(p, axis = 'x', scale = 1) {
   const q = p.compact(), v = q.v;
   const [a, b] = axis === 'x' ? [2, 1] : axis === 'y' ? [0, 2] : [0, 1];
   for (let i = 0; i < v.length; i += STRIDE) { v[i + 6] = v[i + a] * scale; v[i + 7] = v[i + b] * scale; }
+  return q;
+}
+/**
+ * Box uv projection per triangle (each triangle projected along its dominant normal axis, vertices duplicated):
+ * no stretching on curved trim (seats, bolsters), in metres times scale.
+ */
+export function boxUV(p, scale = 1) {
+  const q = new Patch(), v = p.v, T = p.t;
+  for (let k = 0; k < T.length; k += 3) {
+    const o = [T[k] * STRIDE, T[k + 1] * STRIDE, T[k + 2] * STRIDE];
+    const ux = v[o[1]] - v[o[0]], uy = v[o[1] + 1] - v[o[0] + 1], uz = v[o[1] + 2] - v[o[0] + 2];
+    const wx = v[o[2]] - v[o[0]], wy = v[o[2] + 1] - v[o[0] + 1], wz = v[o[2] + 2] - v[o[0] + 2];
+    const nx = Math.abs(uy * wz - uz * wy), ny = Math.abs(uz * wx - ux * wz), nz = Math.abs(ux * wy - uy * wx);
+    const [a, b] = nx >= ny && nx >= nz ? [2, 1] : ny >= nz ? [0, 2] : [0, 1];
+    const ids = o.map((oo) => q.add(v[oo], v[oo + 1], v[oo + 2], v[oo + 3], v[oo + 4], v[oo + 5], v[oo + a] * scale, v[oo + b] * scale));
+    q.tri(ids[0], ids[1], ids[2]);
+  }
   return q;
 }
 export function mergePatches(list) {
@@ -764,7 +797,7 @@ export function curve(pts) { const f = monotone(pts.map((p) => p[0]), pts.map((p
 export function makeBodyKit(kit) {
   const { M } = kit;
   const B = {
-    Patch, clip, split, offset, flip, warp, mirror, roll, skirt, boundary, chains, projectUV, sd, lookup, curve, monotone, sweep, bead, smooth3,
+    Patch, clip, split, offset, flip, warp, mirror, roll, skirt, boundary, chains, boxUV, projectUV, sd, lookup, curve, monotone, sweep, bead, smooth3,
     fromGeometry, toGeometry, computeNormals, merge: mergePatches,
     /** Lofted body surface (see loftBody). Counts scale with the detail setting. */
     loft: (stations, opts = {}) => loftBody(stations, { segFn: (n) => Math.max(1, n * kit.detail), ...opts }),
@@ -903,6 +936,150 @@ export function makeBodyKit(kit) {
     const m = new THREE.Mesh(toGeometry(piece), material);
     m.renderOrder = 1; m.castShadow = false; m.receiveShadow = true;
     return m;
+  };
+  // ---- shared shapes
+  /** Fan caps over every open loop of a patch (mirror glass, lamp backs). Faces away from the patch normal side unless flip. */
+  B.capLoops = (p, { flip: fl = false, lift = 0 } = {}) => {
+    const { edges } = boundary(p);
+    const q = new Patch(), v = p.v;
+    for (const run of chains(edges)) {
+      if (run.length < 4 || run[0] !== run[run.length - 1]) continue;
+      let cx = 0, cy = 0, cz = 0, nx = 0, ny = 0, nz = 0;
+      const pts = run.slice(0, -1);
+      for (const i of pts) { const o = i * STRIDE; cx += v[o]; cy += v[o + 1]; cz += v[o + 2]; nx += v[o + 3]; ny += v[o + 4]; nz += v[o + 5]; }
+      cx /= pts.length; cy /= pts.length; cz /= pts.length;
+      const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+      const c = q.add(cx + nx * lift, cy + ny * lift, cz + nz * lift, 0, 0, 0);
+      const ring = pts.map((i) => { const o = i * STRIDE; return q.add(v[o] + nx * lift, v[o + 1] + ny * lift, v[o + 2] + nz * lift, 0, 0, 0); });
+      for (let k = 0; k < ring.length; k++) { const a = ring[k], b = ring[(k + 1) % ring.length]; if (fl) q.tri(c, a, b); else q.tri(c, b, a); }
+    }
+    // caps are flat: one normal for all their vertices (fan triangles can be degenerate near the rim)
+    computeNormals(q);
+    let ax = 0, ay = 0, az = 0;
+    for (let i = 0; i < q.v.length; i += STRIDE) { ax += q.v[i + 3]; ay += q.v[i + 4]; az += q.v[i + 5]; }
+    const al = Math.hypot(ax, ay, az) || 1;
+    for (let i = 0; i < q.v.length; i += STRIDE) { q.v[i + 3] = ax / al; q.v[i + 4] = ay / al; q.v[i + 5] = az / al; }
+    return q;
+  };
+  /** Ellipsoid patch centred at the origin. */
+  B.ellipsoid = (rx, ry, rz, seg = 20) => {
+    const n = Math.max(8, Math.round(seg * kit.detail));
+    const g = new THREE.SphereGeometry(1, n * 2, n);
+    g.scale(rx, ry, rz);
+    return fromGeometry(g);
+  };
+  /** Plan-view U path (bumpers, skirts): side at half width wx from zEnd towards the face at zFace, corner radius rc. */
+  B.planPath = (wx, zEnd, zFace, rc, n = 9, y = 0) => {
+    const pts = [], sgn = Math.sign(zFace);
+    pts.push([wx, y, zEnd]);
+    pts.push([wx, y, zEnd + (zFace - sgn * rc - zEnd) * 0.5]);
+    for (let i = 0; i <= n; i++) { const a = (i / n) * Math.PI / 2; pts.push([wx - rc + Math.cos(a) * rc, y, zFace - sgn * rc + sgn * Math.sin(a) * rc]); }
+    pts.push([Math.min(0.25, wx - rc - 0.01), y, zFace]);
+    const right = pts.slice(0, -1).reverse().map((p) => [-p[0], p[1], p[2]]);
+    pts.push([0, y, zFace]);
+    return sgn > 0 ? pts.concat(right) : pts.concat(right).reverse();
+  };
+  B.pathLength = (path, sub = 1) => { const P = sub > 1 ? smooth3(path, sub) : path; let L = 0; for (let i = 1; i < P.length; i++) L += Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1], P[i][2] - P[i - 1][2]); return L; };
+  /**
+   * Modern door mirror (left side; mirrored for side = -1): ellipsoid housing cut flat at the back for the glass,
+   * stalk to the door. o: { base: [x, y, z] on the door, size: [w, h, d], mat, capMat, stalkMat, glassMat, out, up, indicator }
+   */
+  B.doorMirror = (o) => {
+    const g = new THREE.Group();
+    const [w, h, d] = o.size ?? [0.2, 0.11, 0.09];
+    const [bx, by, bz] = o.base;
+    const cx = bx + (o.out ?? 0.07) + w / 2, cy = by + (o.up ?? 0.03), cz = bz;
+    let shellP = B.ellipsoid(w / 2, h / 2, d / 2, 22);
+    shellP = warp(shellP, (x, y, z) => [cx + x + (z > 0 ? 0 : -z * 0.15) * Math.sign(x), cy + y * (1 - Math.max(0, x / w) * 0.15), cz + z * (z > 0 ? 1.15 : 1)], true);
+    const zBack = cz - d * 0.22;
+    let housing = clip(shellP, (x, y, z) => zBack - z);
+    const glassP = B.capLoops(housing, { flip: true });
+    // body-colour cap on the front, darker lower half
+    const [capP, lowP] = split(housing, (x, y, z) => cy - 0.006 - y + (z - cz) * 0.2, 0.0015);
+    g.add(B.mesh([capP, roll(capP, { r: 0.0012, depth: 0.003 })], o.capMat ?? kit.paint));
+    g.add(B.mesh([lowP, roll(lowP, { r: 0.0012, depth: 0.003 })], o.mat ?? B.mat.satinBlack()));
+    const gm = B.mesh([offset(glassP, -0.004)], o.glassMat ?? M.shared('car:mirrorGlass', () => M.surface({ color: 0xa8b0ba, roughness: 0.02, metalness: 1 })));
+    g.add(gm);
+    g.add(B.mesh([bead(housing, [[-0.003, 0], [0.0, 0.003], [0.003, 0]])], B.mat.satinBlack()));
+    // stalk: tapered sweep from the door to the housing
+    const st = sweep([[bx - 0.005, by, bz + 0.01], [bx + (o.out ?? 0.07) * 0.6, by + (o.up ?? 0.03) * 0.5, bz], [cx - w * 0.3, cy - h * 0.15, cz]], (s) => { const k = 1 - 0.35 * s; return [[-0.03 * k, -0.014], [0.03 * k, -0.014], [0.03 * k, 0.012], [-0.03 * k, 0.012]]; }, { sub: 4, profileClosed: true, upFn: () => [0, 1, 0] });
+    g.add(B.mesh([st], o.stalkMat ?? B.mat.satinBlack()));
+    if (o.indicator) {
+      const ind = clip(shellP, (x, y, z) => Math.max(B.sd.box(x - cx, y - cy, w * 0.18, -h * 0.05, w * 0.24, h * 0.07, 0.006), -(z - cz) + 0.0));
+      g.add(B.mesh([offset(ind, 0.0006)], B.mat.lensAmber()));
+    }
+    if (o.side === -1) g.scale.x = -1;
+    return g;
+  };
+  /**
+   * Project onto a patch along an axis: returns { p: [x, y, z], n: [nx, ny, nz] } of the hit nearest to `toward`
+   * (axis 'z': a = x, b = y; 'x': a = z, b = y; 'y': a = x, b = z), or null. Brute force: use on small patches.
+   */
+  B.project = (patch, axis, a, b, toward = Infinity) => {
+    const v = patch.v, T = patch.t;
+    const [ia, ib, ic] = axis === 'z' ? [0, 1, 2] : axis === 'x' ? [2, 1, 0] : [0, 2, 1];
+    let best = null, bestD = Infinity;
+    for (let k = 0; k < T.length; k += 3) {
+      const o0 = T[k] * STRIDE, o1 = T[k + 1] * STRIDE, o2 = T[k + 2] * STRIDE;
+      const ax = v[o0 + ia], ay = v[o0 + ib], bx = v[o1 + ia], by = v[o1 + ib], cx = v[o2 + ia], cy = v[o2 + ib];
+      const det = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy);
+      if (Math.abs(det) < 1e-14) continue;
+      const l0 = ((by - cy) * (a - cx) + (cx - bx) * (b - cy)) / det, l1 = ((cy - ay) * (a - cx) + (ax - cx) * (b - cy)) / det, l2 = 1 - l0 - l1;
+      if (l0 < -1e-6 || l1 < -1e-6 || l2 < -1e-6) continue;
+      const c = l0 * v[o0 + ic] + l1 * v[o1 + ic] + l2 * v[o2 + ic];
+      const d = Math.abs(c - toward);
+      if (d < bestD) {
+        bestD = d;
+        const n = [0, 1, 2].map((q) => l0 * v[o0 + 3 + q] + l1 * v[o1 + 3 + q] + l2 * v[o2 + 3 + q]);
+        const nl = Math.hypot(...n) || 1;
+        const pt = [0, 0, 0]; pt[ia] = a; pt[ib] = b; pt[ic] = c;
+        best = { p: pt, n: n.map((q) => q / nl) };
+      }
+    }
+    return best;
+  };
+  // ---- cabin helpers
+  /**
+   * Interior trim shell: the body surface inside the cabin pushed inwards by thick(x, y, z), with returns that
+   * reach the glass, split into roof lining, pillar trims and door cards (+ insert regions).
+   * o: { zFront, zBack, yLow, holes: [glass region f], arches, archFn, thick, belt(z), onTop, overlap,
+   *      mats: { roof, pillar, card }, inserts: [{ f, mat, gap }] }
+   */
+  B.trimShell = (S, o) => {
+    let shell = clip(S.patch, (x, y, z) => Math.max(z - o.zFront, o.zBack - z, o.yLow - y));
+    for (const a of o.arches || []) shell = clip(shell, (x, y, z) => -o.archFn(a, 0.01)(x, y, z));
+    const ov = o.overlap ?? 0.008;
+    for (const f of o.holes) shell = clip(shell, (x, y, z) => -(f(x, y, z) + ov));
+    const innerAll = flip(offset(shell, (x, y, z) => -o.thick(x, y, z)));
+    const lip = roll(innerAll, { r: 0.003, depth: (x, y, z) => o.thick(x, y, z) + 0.002, only: (x, y, z) => Math.abs(z - o.zFront) > 0.02 && Math.abs(z - o.zBack) > 0.02 && y > o.yLow + 0.04 });
+    const trim = mergePatches([innerAll, lip]);
+    const [lower, upper] = split(trim, (x, y, z) => y - o.belt(z) - (o.beltLift ?? 0.012), 0);
+    const [roof, pillar] = split(upper, (x, y, z) => o.onTop(x, y, z) + 0.01, 0);
+    const g = new THREE.Group(); g.name = 'trim';
+    let rest = lower;
+    for (const ins of o.inserts || []) { const [a, b] = split(rest, ins.f, ins.gap ?? 0.003); g.add(B.mesh([projectUV(a, 'x', 1)], ins.mat, { name: 'trim-insert' })); rest = b; }
+    g.add(B.mesh([projectUV(rest, 'x', 1)], o.mats.card, { name: 'trim-card' }));
+    g.add(B.mesh([projectUV(roof, 'y', 1)], o.mats.roof, { name: 'trim-roof' }));
+    g.add(B.mesh([projectUV(pillar, 'x', 1)], o.mats.pillar, { name: 'trim-pillar' }));
+    return g;
+  };
+  /** Carpeted floor pan: height field y = fy(x, z) clipped to the inside of the body (minus margin(y, z)). */
+  B.floorPan = (S, { x0 = -0.8, x1 = 0.8, z0, z1, fy, margin = () => 0.04, nx = 40, nz = 64 }) => {
+    const NX = Math.max(16, Math.round(nx * kit.detail)), NZ = Math.max(24, Math.round(nz * kit.detail));
+    const p = new Patch();
+    for (let j = 0; j <= NZ; j++) for (let i = 0; i <= NX; i++) { const x = x0 + (x1 - x0) * (i / NX), z = z0 + (z1 - z0) * (j / NZ); p.add(x, fy(x, z), z, 0, 1, 0, x, z); }
+    for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) { const a = j * (NX + 1) + i, b = a + 1, c = a + NX + 1, d = c + 1; p.tri(a, c, b); p.tri(b, c, d); }
+    computeNormals(p);
+    return clip(p, (x, y, z) => Math.abs(x) - (S.sideAt(z, y + 0.06) - margin(y, z)));
+  };
+  /** Dash/console sweep across x (path from +half to -half); prof(x) -> [[z, y], ...] (same count for every x). */
+  B.dashSweep = (half, prof, { n = 90, clipTo = null } = {}) => {
+    const N = Math.max(30, Math.round(n * kit.detail));
+    const path = [];
+    for (let i = 0; i <= N; i++) path.push([half - (2 * half * i) / N, 0, 0]);
+    let p = sweep(path, (s) => prof(half - 2 * half * s), { up: [0, 1, 0], flip: true });
+    if (clipTo) p = clip(p, clipTo);
+    return p;
   };
   /** Geometry helpers as patches. */
   B.from = (g) => fromGeometry(g);
