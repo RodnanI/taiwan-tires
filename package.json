@@ -1,0 +1,18 @@
+{
+  "name": "taiwan-tires",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Taiwan street racing and drifting game. Builds to a single standalone HTML file.",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "dev": "node tools/build.mjs --watch --serve",
+    "validate": "node tools/validate.mjs",
+    "test": "node tools/test.mjs"
+  },
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "three": "^0.186.1"
+  }
+}
