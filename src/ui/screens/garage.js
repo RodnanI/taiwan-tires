@@ -37,11 +37,9 @@ export default function garage({ game, open, back, refresh }) {
     const sum = specSummary(spec);
     const perf = perfPanel(def, car);
     detail.innerHTML = '';
+    // actions first: the panel scrolls, and the things you came here to do must never be below the fold
     detail.append(
       h('div.row', {}, h('div.grow', {}, h('div', { style: { color: 'var(--dim)', letterSpacing: '0.2em', fontSize: '13px' } }, `${def.year || ''} ${def.make}`.toUpperCase()), h('div', { style: { fontSize: '30px', fontWeight: 700 } }, def.name)), def.placeholder ? chip('prototype', 'warn') : null),
-      perf.el,
-      h('div.kv', {}, h('span', {}, 'Engine'), h('span', {}, sum.engine), h('span', {}, 'Power'), h('span', {}, `${sum.hp} hp @ ${sum.powerRpm} rpm`), h('span', {}, 'Torque'), h('span', {}, `${sum.torque} Nm`),
-        h('span', {}, 'Weight'), h('span', {}, `${sum.mass} kg · ${Math.round(sum.weightFront * 100)}% front`), h('span', {}, 'Drivetrain'), h('span', {}, `${sum.drivetrain} · ${sum.gears}-speed`), h('span', {}, 'Tyres'), h('span', {}, sum.compound)),
       h('div.row', { style: { flexWrap: 'wrap' } },
         P.data.selected === uid ? chip('selected', 'acc') : button('Select', () => { P.select(uid); refresh(); }, { primary: true, zh: '選擇' }),
         button('Upgrades', () => open('upgrades', { uid }), { zh: '改裝' }),
@@ -49,6 +47,9 @@ export default function garage({ game, open, back, refresh }) {
         button('AI tune', () => open('aitune', { uid }), { zh: 'AI調校' }),
         button('Paint & body', () => open('paint', { uid }), { zh: '烤漆' }),
         P.garage.length > 1 ? button(`Sell ${fmtCredits(Math.round(def.price * 0.6))}`, () => { P.sellCar(uid); focusUid = P.selectedCar().uid; refresh(); }, { danger: true }) : null),
+      perf.el,
+      h('div.kv', {}, h('span', {}, 'Engine'), h('span', {}, sum.engine), h('span', {}, 'Power'), h('span', {}, `${sum.hp} hp @ ${sum.powerRpm} rpm`), h('span', {}, 'Torque'), h('span', {}, `${sum.torque} Nm`),
+        h('span', {}, 'Weight'), h('span', {}, `${sum.mass} kg · ${Math.round(sum.weightFront * 100)}% front`), h('span', {}, 'Drivetrain'), h('span', {}, `${sum.drivetrain} · ${sum.gears}-speed`), h('span', {}, 'Tyres'), h('span', {}, sum.compound)),
     );
   };
   for (const car of P.garage) {

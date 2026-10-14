@@ -128,9 +128,23 @@ export class MenuScene {
     this.vehicle.headlightsOn = true; this.vehicle.lightsAuto = false;
     this.scene.add(this.vehicle.root);
     this.vehicle.enableHeadlightLights(this.q.dynamicLights > 0, this.scene, false);
+    this.addScreenGlow(this.vehicle);
     this.game.audio?.attachVehicle(this.vehicle, true, { menu: true });
     this.game.renderer.post?.resetHistory();
     if (this.cameraMode === 'cockpit') this.startTransition();
+  }
+
+  /** Light spill from the lit head unit onto the dash, wheel and console (the cabin is otherwise dark at night). */
+  addScreenGlow(v) {
+    const sc = v.screen;
+    if (!sc || this.q.materials === 'basic') return;
+    const tl = new THREE.Vector3(...sc.tl), tr = new THREE.Vector3(...sc.tr), bl = new THREE.Vector3(...sc.bl), br = new THREE.Vector3(...sc.br);
+    const c = tl.clone().add(tr).add(bl).add(br).multiplyScalar(0.25);
+    const n = tr.clone().sub(tl).cross(bl.clone().sub(tl)).normalize();
+    if (n.z > 0) n.negate(); // face the cabin (rearwards)
+    const glow = new THREE.PointLight(0xffc89a, 0.12, 2.2, 2);
+    glow.position.copy(c).addScaledVector(n, 0.25);
+    v.root.add(glow);
   }
 
   setCameraMode(mode) {
@@ -176,14 +190,14 @@ export class MenuScene {
     const L = v ? v.spec.dimensions[0] : 4.4;
     if (!this.orbit.drag) this.orbit.yaw += dt * 0.12 + this.orbit.vel * dt;
     this.orbit.vel *= Math.exp(-dt * 3);
-    const dist = Math.max(5.2, L * 1.32);
+    const p = this.game.ui?.info?.sideFrac || 0;                 // screen fraction covered by the docked head unit
+    const dist = Math.max(5.2, L * (1.32 + p * 0.3));
     const c = v ? v.root.position : _v.set(0, 0, 0);
-    // offset the look point so the car sits left of the docked panel
-    const side = window.innerWidth > 900 ? 0.9 : 0;
+    // shift the camera sideways so the car is centred in the free part of the screen (NDC x = -p)
+    const side = p * Math.tan(this.camera.fov * Math.PI / 360) * this.camera.aspect * dist;
     outLook.set(c.x, 0.7, c.z);
     outPos.set(c.x + Math.sin(this.orbit.yaw) * dist, 1.35 + this.orbit.pitch * dist, c.z + Math.cos(this.orbit.yaw) * dist);
     const rightV = _v.set(Math.cos(this.orbit.yaw), 0, -Math.sin(this.orbit.yaw));
-    outLook.addScaledVector(rightV, -side * 0.0);
     outPos.addScaledVector(rightV, side);
     outLook.addScaledVector(rightV, side);
     return true;

@@ -6,6 +6,8 @@ import { SCREENS } from './screens/index.js';
 import { fmtCredits } from '../core/math.js';
 
 export const HU_W = 1280, HU_H = 720;
+// docked beside the car (showroom screens) the unit reflows to a narrower logical width so text stays readable
+export const HU_SIDE_W = 880;
 
 const DOCK = [
   { id: 'home', en: 'HOME', zh: '主頁', icon: 'home' },
@@ -203,6 +205,8 @@ export class Infotainment {
   setQuad(tl, tr, bl, br) {
     const m = homography([0, 0, HU_W, 0, 0, HU_H, HU_W, HU_H], [...tl, ...tr, ...bl, ...br]);
     if (!m) return;
+    this.el.style.width = '';
+    this.sideFrac = 0;
     this.el.style.transform = `matrix3d(${m.join(',')})`;
     this.el.dataset.mode = 'cockpit';
     this.mode = 'cockpit';
@@ -210,8 +214,16 @@ export class Infotainment {
   setFlat(kind = 'center') {
     const W = window.innerWidth, H = window.innerHeight;
     let s, x, y;
-    if (kind === 'side') { s = Math.min((W * 0.44) / HU_W, (H * 0.86) / HU_H); x = W - HU_W * s - Math.max(16, W * 0.025); y = (H - HU_H * s) / 2; }
-    else { s = Math.min((W * 0.92) / HU_W, (H * 0.9) / HU_H, 1.25); x = (W - HU_W * s) / 2; y = (H - HU_H * s) / 2; }
+    if (kind === 'side') {
+      const margin = Math.max(16, W * 0.025);
+      s = Math.min((W * 0.52) / HU_SIDE_W, (H * 0.88) / HU_H);
+      x = W - HU_SIDE_W * s - margin; y = (H - HU_H * s) / 2;
+      this.el.style.width = HU_SIDE_W + 'px';
+      this.sideFrac = (HU_SIDE_W * s + margin) / W; // MenuScene frames the car in the remaining space
+    } else {
+      s = Math.min((W * 0.92) / HU_W, (H * 0.9) / HU_H, 1.25); x = (W - HU_W * s) / 2; y = (H - HU_H * s) / 2;
+      this.el.style.width = ''; this.sideFrac = 0;
+    }
     this.el.style.transform = `matrix3d(${s},0,0,0,0,${s},0,0,0,0,1,0,${x},${y},0,1)`;
     this.el.dataset.mode = 'flat';
     this.mode = kind === 'side' ? 'side' : 'flat';

@@ -87,12 +87,12 @@ const GENERATORS = {
     const g = col.getContext('2d');
     g.strokeStyle = 'rgba(40,40,40,0.35)'; g.lineWidth = Math.max(1, n / 256);
     g.beginPath(); g.moveTo(0, 1); g.lineTo(n, 1); g.moveTo(1, 0); g.lineTo(1, n); g.stroke();
-    return { map: tex(col), normalMap: normalFromHeight(f, n, 2) };
+    return { map: tex(col), normalMap: normalFromHeight(f, n, 0.8) };
   },
   grass(n) {
     const h = noiseField(n, 6, 4, 5), f = noiseField(n, 60, 2, 6);
     const col = fromField(n, (x, y) => { const a = h[y * n + x], b = f[y * n + x]; return [48 + a * 30 + b * 20, 74 + a * 40 + b * 30, 30 + a * 14]; });
-    return { map: tex(col), normalMap: normalFromHeight(f, n, 3) };
+    return { map: tex(col), normalMap: normalFromHeight(f, n, 1.6) };
   },
   dirt(n) {
     const h = noiseField(n, 6, 5, 7), f = noiseField(n, 50, 2, 8);

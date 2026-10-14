@@ -301,7 +301,7 @@ export class PostChain {
     if (q.dof) P.dof = new DofPass(q.detail >= 1.4 ? 56 : 36);
     if (q.bloom && q.bloom !== 'off') {
       const div = q.bloom === 'low' ? 4 : 2;
-      P.bloom = new UnrealBloomPass(new THREE.Vector2(this.width / div, this.height / div), q.bloom === 'low' ? 0.45 : 0.62, 0.55, 1.05);
+      P.bloom = new UnrealBloomPass(new THREE.Vector2(this.width / div, this.height / div), q.bloom === 'low' ? 0.3 : 0.4, 0.42, 1.35);
     }
     P.final = new FinalPass();
     if (q.antialias === 'smaa' || q.antialias === 'msaa4smaa' || q.antialias === 'msaa8smaa') { P.aa = new SMAAPass(); P.aa.setSize(this.width, this.height); }
@@ -350,7 +350,7 @@ export class PostChain {
       u.focus.value = info.dof.focus; u.aperture.value = info.dof.aperture ?? 1; u.maxBlur.value = (info.dof.maxBlur ?? 10) * this.height / 1080;
       run(P.dof);
     }
-    if (P.bloom) { P.bloom.strength = (q.bloom === 'low' ? 0.42 : 0.6) * (info.bloomScale ?? 1); run(P.bloom); }
+    if (P.bloom) { P.bloom.strength = (q.bloom === 'low' ? 0.28 : 0.38) * (info.bloomScale ?? 1); run(P.bloom); } // subtle: only real highlights glow, no milky veil
     // final
     const fu = P.final.material.uniforms;
     fu.exposure.value = info.exposure ?? 1; fu.toneMode.value = info.toneMode ?? 1; fu.saturation.value = info.saturation ?? 1.05;
