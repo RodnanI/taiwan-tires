@@ -75,7 +75,9 @@ export function buildExterior(ctx) {
       return [0, 0.03 * smooth(-1.95, -2.25, z) * smooth(0.9, 0.98, y) * smooth(0.8, 0.5, x)];
     },
   ];
+  // AI and distant cars (no interior) use a lighter surface
   const S = B.loft(stations, {
+    lod: ctx.interior ? 1 : 0.7,
     fillet: [2, 3, 4, 6, 5, 7, 8], seg: [5, 1, 8, 9, 10, 13], rows: 210, cluster: 0.25,
     capRear: { dome: 0.012, rings: 22, yc: 0.55 }, capFront: { dome: 0.025, rings: 22, yc: 0.42 }, displace,
   });
@@ -116,7 +118,8 @@ export function buildExterior(ctx) {
   // ------------------------------------------------------------------ lamps
   const fHL = (x, y, z) => Math.max(sd.poly(A(x), y, [[0.44, 0.69], [0.62, 0.722], [0.81, 0.758], [0.872, 0.744], [0.862, 0.708], [0.7, 0.677], [0.47, 0.655]]) - 0.006, 1.97 - z);
   let [headL, b4] = B.cut(body, fHL, { gap: 0.004 });
-  const fBar = (x, y, z) => Math.max(Math.min(sd.box(x, y, 0, 0.895, 0.72, 0.011, 0.006), sd.poly(A(x), y, [[0.62, 0.878], [0.88, 0.86], [0.9, 0.9], [0.84, 0.935], [0.62, 0.91]]) - 0.004), z + 2.08);
+  // full-width bar on the upright rear face, blended into the outer clusters
+  const fBar = (x, y, z) => Math.max(sd.smin(sd.box(x, y, 0, 0.858, 0.7, 0.012, 0.006), sd.poly(A(x), y, [[0.6, 0.846], [0.87, 0.83], [0.885, 0.87], [0.83, 0.9], [0.6, 0.876]]) - 0.004, 0.03), z + 2.1);
   let [tailL, b5] = B.cut(b4, fBar, { gap: 0.003 });
   body = b5;
 
@@ -183,9 +186,11 @@ export function buildExterior(ctx) {
     ...(roofPanel ? { roof: [roofStyle === 'carbon' ? B.projectUV(roofPanel, 'y', 3) : roofPanel] } : {}),
   }, { paint: kit.paint, satin: mat.glossBlack(), gloss: mat.blackPlastic(), blackPlastic: mat.blackPlastic(), frit: mat.frit(), roof: roofStyle === 'carbon' ? M.carbon() : mat.glossBlack() }));
   const sink = (p, d) => B.offset(p, -d);
-  g.add(B.glass([sink(wsClear, 0.003), sink(rgClear, 0.003), sink(glass1, 0.005), sink(glass2, 0.004)], { tint: 0x0d1215, outer: 0.62, inner: 0.1 }));
+  const dark = (mods.tint || 'dark') === 'dark';
+  g.add(B.glass([sink(wsClear, 0.003)], { tint: 0x111618, outer: 0.55, inner: 0.1 }));
+  g.add(B.glass([sink(rgClear, 0.003), sink(glass1, 0.005), sink(glass2, 0.004)], dark ? { tint: 0x050607, outer: 0.8, inner: 0.28 } : { tint: 0x111618, outer: 0.55, inner: 0.1 }));
   const sealP = [[-0.006, -0.004], [-0.002, 0.0012], [0.003, 0.0018], [0.006, -0.003]];
-  g.add(B.mesh([B.bead(ws, sealP), B.bead(rg, sealP), B.bead(glass2, [[-0.003, -0.004], [0, 0.001], [0.004, 0.0012], [0.006, -0.004]]), glassWall], mat.rubber(), { name: 'seals' }));
+  g.add(B.mesh([...(ctx.interior ? [B.bead(ws, sealP), B.bead(rg, sealP), B.bead(glass2, [[-0.003, -0.004], [0, 0.001], [0.004, 0.0012], [0.006, -0.004]])] : []), glassWall], mat.rubber(), { name: 'seals' }));
   for (const a of arches) g.add(B.mesh(B.wheelWell(S, { z: a.z, y: a.y, r: a.r + 0.004, xi: a.z > 0 ? xiF : xiR, bottom: 0.13 }), mat.wellLiner(), { name: 'well' }));
 
   // ------------------------------------------------------------------ grille: layered horizontal vanes, emblem; side intake meshes; gill strakes
@@ -258,7 +263,7 @@ export function buildExterior(ctx) {
     g.add(B.mesh([backP, B.skirt(tailL, [0, 0, 0.02])], M.shared('ty:tlHouse', () => M.surface({ color: 0x140506, roughness: 0.35, metalness: 0.3 }))));
     g.add(B.mesh([B.offset(tailL, -0.012)], B.emitter('brake', 0xff1f14, 0.35)));
     for (const sx of [1, -1]) {
-      const hit = B.project(tailL, 'z', sx * 0.76, 0.893, -3);
+      const hit = B.project(tailL, 'z', sx * 0.76, 0.86, -3);
       if (!hit) continue;
       const rev = new THREE.Mesh(kit.geo.roundedBox(0.1, 0.012, 0.004, 0.004, 1), B.emitter('reverse', 0xf6f3ec, 0.02));
       rev.position.set(hit.p[0], hit.p[1] - 0.015, hit.p[2] + 0.004);

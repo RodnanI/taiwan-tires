@@ -149,14 +149,17 @@ export function buildCabin(ctx, ex) {
     // aftermarket double-DIN unit (the menu is projected onto its screen)
     g.add(I.headUnit({ pos: [0, 0.715, faceZ(0.715) - 0.01], size: [0.16, 0.09], tilt: lean / (Math.PI / 180) + 4, style: 'doubleDin', bezel: 0.009 }));
     // HVAC: three sliders on a lit strip and a fan knob
-    const hvC = B.canvas(512, 128), hg = hvC.getContext('2d');
-    hg.fillStyle = '#0c0c0d'; hg.fillRect(0, 0, 512, 128);
-    hg.strokeStyle = '#3a3b3e'; hg.lineWidth = 3;
-    for (let i = 0; i < 3; i++) { hg.beginPath(); hg.moveTo(40, 30 + i * 34); hg.lineTo(470, 30 + i * 34); hg.stroke(); }
-    hg.fillStyle = '#e8b04a'; hg.font = `600 18px ${B.fonts.ui}`; hg.textAlign = 'left';
-    ['TEMP  ❄ ─────── ♨', 'MODE  ▲  ▼  ⇣  ⌇', 'FAN   0  1  2  3  4'].forEach((t, i) => hg.fillText(t, 44, 22 + i * 34));
-    const hvT = B.tex(hvC);
-    const hv = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.05), M.surface({ color: 0xffffff, map: hvT, emissive: 0xffffff, emissiveMap: hvT, emissiveIntensity: 0.35, roughness: 0.4 }));
+    const hvM = M.shared('kz:hvac', () => {
+      const hvC = B.canvas(512, 128), hg = hvC.getContext('2d');
+      hg.fillStyle = '#0c0c0d'; hg.fillRect(0, 0, 512, 128);
+      hg.strokeStyle = '#3a3b3e'; hg.lineWidth = 3;
+      for (let i = 0; i < 3; i++) { hg.beginPath(); hg.moveTo(40, 30 + i * 34); hg.lineTo(470, 30 + i * 34); hg.stroke(); }
+      hg.fillStyle = '#e8b04a'; hg.font = `600 18px ${B.fonts.ui}`; hg.textAlign = 'left';
+      ['TEMP  ❄ ─────── ♨', 'MODE  ▲  ▼  ⇣  ⌇', 'FAN   0  1  2  3  4'].forEach((t, i) => hg.fillText(t, 44, 22 + i * 34));
+      const hvT = B.tex(hvC);
+      return M.surface({ color: 0xffffff, map: hvT, emissive: 0xffffff, emissiveMap: hvT, emissiveIntensity: 0.35, roughness: 0.4 });
+    });
+    const hv = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.05), hvM);
     hv.position.set(0, 0.6, faceZ(0.6) - 0.002); hv.rotation.set(-lean, Math.PI, 0);
     g.add(hv);
     for (let i = 0; i < 3; i++) { const k = new THREE.Mesh(kit.geo.roundedBox(0.012, 0.012, 0.014, 0.003, 1), M.shared('kz:slider', () => M.surface({ color: 0xbfc1c4, roughness: 0.3, metalness: 0.6 }))); k.position.set(0.06 - i * 0.045, 0.612 - i * 0.0085, faceZ(0.612) - 0.008); g.add(k); }
@@ -270,12 +273,14 @@ export function buildCabin(ctx, ex) {
     mirror.rotation.y = 0.18;
     g.add(stalk, mirror);
     // 平安 charm on a red string (a very Taiwanese mirror ornament)
-    const charmC = B.canvas(128, 192), cg = charmC.getContext('2d');
-    cg.fillStyle = '#b3151a'; cg.fillRect(0, 0, 128, 192);
-    cg.strokeStyle = '#e7b74c'; cg.lineWidth = 6; cg.strokeRect(8, 8, 112, 176);
-    cg.fillStyle = '#f0c25a'; cg.font = `700 52px ${B.fonts.cjk}`; cg.textAlign = 'center'; cg.textBaseline = 'middle';
-    cg.fillText('平', 64, 62); cg.fillText('安', 64, 128);
-    const charmM = M.surface({ color: 0xffffff, map: B.tex(charmC), roughness: 0.7 });
+    const charmM = M.shared('kz:charm', () => {
+      const charmC = B.canvas(128, 192), cg = charmC.getContext('2d');
+      cg.fillStyle = '#b3151a'; cg.fillRect(0, 0, 128, 192);
+      cg.strokeStyle = '#e7b74c'; cg.lineWidth = 6; cg.strokeRect(8, 8, 112, 176);
+      cg.fillStyle = '#f0c25a'; cg.font = `700 52px ${B.fonts.cjk}`; cg.textAlign = 'center'; cg.textBaseline = 'middle';
+      cg.fillText('平', 64, 62); cg.fillText('安', 64, 128);
+      return M.surface({ color: 0xffffff, map: B.tex(charmC), roughness: 0.7 });
+    });
     const charm = new THREE.Mesh(kit.geo.roundedBox(0.034, 0.05, 0.007, 0.003, 1), charmM);
     charm.position.set(-0.02, my - 0.2, hz - 0.03);
     charm.rotation.y = Math.PI + 0.3;

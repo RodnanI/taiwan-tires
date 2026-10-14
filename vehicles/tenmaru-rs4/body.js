@@ -46,7 +46,9 @@ export function buildExterior(ctx) {
     for (const a of arches) { const q = Math.hypot(z - a.z, y - a.y) - a.r; d = Math.max(d, q < 0.02 ? 1 : 1 - smooth(0.05, 0.24, q)); }
     return [0.034 * d * smooth(0.98, 0.8, y) * smooth(0.62, 0.76, x), 0];
   };
+  // AI and distant cars (no interior) use a lighter surface
   const S = B.loft(stations, {
+    lod: ctx.interior ? 1 : 0.7,
     fillet: [2, 3, 4, 6, 4, 6, 7], seg: [5, 1, 8, 8, 9, 12], rows: 200, cluster: 0.25,
     capRear: { dome: 0.01, rings: 22 }, capFront: { dome: 0.02, rings: 22 }, displace: [flare],
   });
@@ -145,9 +147,11 @@ export function buildExterior(ctx) {
     frit: [wsFrit, rgFrit],
   }, { paint: kit.paint, satin: mat.satinBlack(), blackPlastic: mat.blackPlastic(), frit: mat.frit() }));
   const sink = (p, d) => B.offset(p, -d);
-  g.add(B.glass([sink(wsClear, 0.003), sink(rgClear, 0.003), sink(glass1, 0.005), sink(glass2, 0.005), sink(glass3, 0.004)], { tint: 0x141c20, outer: 0.55, inner: 0.1 }));
+  const dark = mods.tint === 'dark';
+  g.add(B.glass([sink(wsClear, 0.003)], { tint: 0x141c20, outer: 0.55, inner: 0.1 }));
+  g.add(B.glass([sink(rgClear, 0.003), sink(glass1, 0.005), sink(glass2, 0.005), sink(glass3, 0.004)], dark ? { tint: 0x050607, outer: 0.82, inner: 0.3 } : { tint: 0x141c20, outer: 0.55, inner: 0.1 }));
   const sealP = [[-0.006, -0.004], [-0.002, 0.0015], [0.003, 0.0022], [0.006, -0.003]];
-  g.add(B.mesh([B.bead(ws, sealP), B.bead(rg, sealP), B.bead(glass3, [[-0.003, -0.004], [0, 0.001], [0.004, 0.0012], [0.006, -0.004]]), glassWall], mat.rubber(), { name: 'seals' }));
+  g.add(B.mesh([...(ctx.interior ? [B.bead(ws, sealP), B.bead(rg, sealP), B.bead(glass3, [[-0.003, -0.004], [0, 0.001], [0.004, 0.0012], [0.006, -0.004]])] : []), glassWall], mat.rubber(), { name: 'seals' }));
   for (const a of arches) g.add(B.mesh(B.wheelWell(S, { z: a.z, y: a.y, r: a.r + 0.004, xi, bottom: 0.15 }), mat.wellLiner(), { name: 'well' }));
 
   // ------------------------------------------------------------------ grilles: mouth (intercooler + mesh), side intakes, upper grille
@@ -306,11 +310,13 @@ export function buildExterior(ctx) {
     const skirtP = B.sweep(sk, [[-0.02, 0.24], [0.01, 0.24], [0.028, 0.27], [0.026, 0.33], [0.0, 0.345]], { sub: 2, capStart: true, capEnd: true });
     g.add(B.mesh([skirtP, B.mirror(skirtP)], kit.paint, { name: 'skirt' }));
     if ((mods.mudflaps ?? 'on') === 'on') {
-      const fc = B.canvas(256, 256), fg = fc.getContext('2d');
-      fg.fillStyle = '#c4161c'; fg.fillRect(0, 0, 256, 256);
-      fg.fillStyle = '#f4f1ea'; fg.font = `800 54px ${B.fonts.ui}`; fg.textAlign = 'center'; fg.textBaseline = 'middle';
-      fg.fillText('TENMARU', 128, 92); fg.font = `700 34px ${B.fonts.ui}`; fg.fillText('RALLY', 128, 150);
-      const flapM = M.surface({ color: 0xffffff, map: B.tex(fc), roughness: 0.75, side: THREE.DoubleSide });
+      const flapM = M.shared('rs4:flap', () => {
+        const fc = B.canvas(256, 256), fg = fc.getContext('2d');
+        fg.fillStyle = '#c4161c'; fg.fillRect(0, 0, 256, 256);
+        fg.fillStyle = '#f4f1ea'; fg.font = `800 54px ${B.fonts.ui}`; fg.textAlign = 'center'; fg.textBaseline = 'middle';
+        fg.fillText('TENMARU', 128, 92); fg.font = `700 34px ${B.fonts.ui}`; fg.fillText('RALLY', 128, 150);
+        return M.surface({ color: 0xffffff, map: B.tex(fc), roughness: 0.75, side: THREE.DoubleSide });
+      });
       for (const az of [zAx, -zAx]) for (const sx of [1, -1]) {
         const f = new THREE.Mesh(kit.geo.roundedBox(0.22, 0.26, 0.006, 0.012, 1), flapM);
         f.position.set(sx * 0.765, 0.2, az - 0.395);
@@ -345,7 +351,7 @@ export function buildExterior(ctx) {
   }
 
   // ------------------------------------------------------------------ roof vortex generator
-  if ((mods.vortex ?? 'on') === 'on') {
+  if ((mods.vortex ?? 'on') !== 'off') {
     const fins = [];
     for (let i = 0; i < 9; i++) {
       const x = -0.4 + (0.8 * i) / 8, z = zRoofR(A(x)) + 0.06, y = S.topAt(z, x);
@@ -354,7 +360,7 @@ export function buildExterior(ctx) {
       fins.push(f);
     }
     const bar = kit.geo.place(kit.geo.roundedBox(0.84, 0.006, 0.07, 0.003, 1), [0, S.topAt(zRoofR(0.2) + 0.05, 0) - 0.002, zRoofR(0.2) + 0.05]);
-    g.add(new THREE.Mesh(kit.geo.merge([...fins, bar]), mods.vortexColor === 'body' ? kit.paint : mat.satinBlack()));
+    g.add(new THREE.Mesh(kit.geo.merge([...fins, bar]), mods.vortex === 'body' ? kit.paint : mat.satinBlack()));
   }
 
   // ------------------------------------------------------------------ mirrors, handles, wipers, antenna

@@ -1,7 +1,7 @@
+// Hoshino Kaze 86 (1986): light rear-drive hatch coupe, the touge drift starter. Model: body.js (exterior,
+// pop-up headlamps animate with the lights) and cabin.js (80s interior); see vehicles/AGENTS.md "Body toolkit".
 import { buildExterior } from './body.js';
 import { buildCabin } from './cabin.js';
-// PLACEHOLDER car (prototype geometry). Replace model.build with a detailed model; keep the specs block.
-// Archetype: 1980s light rear-drive hatch coupe. Cheap, rev-happy, the classic touge drift starter.
 export default {
   id: 'hoshino-kaze86',
   name: 'Kaze 86',
@@ -10,7 +10,6 @@ export default {
   country: 'JP',
   price: 680000,
   starter: true,
-  placeholder: true,
   tags: ['jdm', 'drift', 'lightweight', 'rwd'],
   description: 'Featherweight rear-drive hatch with a screaming 1.6 twin-cam. Low grip, perfect balance, endless lessons.',
 
@@ -46,29 +45,28 @@ export default {
     slots: {
       rims: { name: 'Rims', zh: '輪框', options: [
         { id: 'spoke5', name: '5-spoke', price: 0 }, { id: 'mesh', name: 'Cross mesh', price: 42000 }, { id: 'dish', name: 'Deep dish', price: 36000 },
-        { id: 'split6', name: 'Split 6', price: 38000 }, { id: 'steelie', name: 'Steelie', price: 9000 }, { id: 'turbofan', name: 'Turbofan', price: 45000 }] },
+        { id: 'split6', name: 'Split 6', price: 38000 }, { id: 'steelie', name: 'Steelie', price: 9000 }, { id: 'turbofan', name: 'Turbofan', price: 45000 },
+        { id: 'eight', name: 'Classic 8-spoke', price: 40000 }] },
       spoiler: { name: 'Spoiler', zh: '尾翼', options: [{ id: 'none', name: 'None', price: 0 }, { id: 'lip', name: 'Hatch lip', price: 8000 }, { id: 'gt', name: 'GT wing', price: 26000 }] },
       tint: { name: 'Window tint', zh: '隔熱紙', options: [{ id: 'light', name: 'Light', price: 0 }, { id: 'dark', name: 'Dark', price: 6000 }] },
+      livery: { name: 'Two-tone', zh: '雙色', options: [{ id: 'none', name: 'Single colour', price: 0 }, { id: 'panda', name: 'Panda (black lower)', price: 15000 }] },
     },
   },
 
   model: {
     build(ctx) {
-      const { THREE, kit, spec, visual, parts, interior } = ctx;
-      const { ext, presets } = kit;
+      const { THREE, kit, interior } = ctx;
       const body = new THREE.Group();
       kit.wheels({ rimRatio: 0.585, lugs: 4, color: 0xc4c6ca, caliperColor: 0x34363a });
       const ex = buildExterior(ctx);
       body.add(ex.group);
-      const R = spec.tires.radius[0], wb = spec.wheelbase;
-      body.add(ext.exhaust({ pos: [-0.42, 0.26, -2.12], radius: 0.035 }));
       let eye = [0.37, 1.075, -0.36];
       if (interior) {
         const cab = buildCabin(ctx, ex);
         body.add(cab.group);
         eye = cab.eye;
       }
-      return { body, animate: ex.animate, anchors: { cockpit: eye, hood: [0, 1.02, 0.45], bumper: [0, 0.55, 2.1] } };
+      return { body, animate: ex.animate, anchors: { cockpit: eye, hood: [0, 0.98, 0.64], bumper: [0, 0.55, 2.1] } };
     },
   },
 };

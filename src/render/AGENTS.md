@@ -11,7 +11,7 @@ resolved values (`q.shadows`, `q.ssr`...).
 | `PostFX.js` | HDR post chain: GTAO, wet SSR, god rays, motion blur, depth of field, bloom, final grade, SMAA / FXAA. |
 | `Environment.js` | Sky shader, sun/moon path for Taiwan's latitude, time of day keyframes, fog, weather (rain, wetness), cube-map reflections, shadow camera. |
 | `materials.js` | `MaterialFactory` (quality-aware: basic / standard / physical), paint finishes, shared material cache. |
-| `textures.js` | Procedural texture generators (asphalt, concrete, grass, dirt, carbon, leather, tread, grille, brushed...). |
+| `textures.js` | Procedural texture generators (asphalt, concrete, grass, dirt, carbon, leather, tread, grille, brushed; car trim: grain, cloth80s, carpet, headliner, alcantara, perforated, quilted, speaker; lamp optics: lensOptic, lensRibs, lensFlutes). |
 | `LightManager.js` | Virtual lights: maps register hundreds; the N most relevant become real point lights each frame. |
 | `Particles.js` | Instanced billboards: tyre smoke, dust, sparks, backfire flames, rain spray. |
 | `SkidMarks.js` | One ring buffer of road quads for all cars. |

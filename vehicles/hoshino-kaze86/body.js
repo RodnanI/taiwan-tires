@@ -42,7 +42,9 @@ export function buildExterior(ctx) {
     for (const a of arches) { const q = Math.hypot(z - a.z, y - a.y) - a.r; if (q > -0.06 && q < 0.13) d = Math.max(d, q < 0 ? 1 : Math.pow(1 - q / 0.13, 2)); }
     return [0.009 * d * smooth(0.55, 0.7, x), 0];
   };
+  // AI and distant cars (no interior) use a lighter surface
   const S = B.loft(stations, {
+    lod: ctx.interior ? 1 : 0.7,
     fillet: [2, 3, 4, 4, 4, 6, 6], seg: [5, 1, 10, 8, 10, 11], rows: 190, cluster: 0.25,
     capRear: { dome: 0.006, rings: 22 }, capFront: { dome: 0.014, rings: 22 }, displace: [flare],
   });
@@ -147,12 +149,14 @@ export function buildExterior(ctx) {
   }, { paint: kit.paint, paint2, satin: mat.satinBlack(), blackPlastic: mat.blackPlastic(), frit: mat.frit() }));
   // glass sits a few mm inside its opening
   const sink = (p, d) => B.offset(p, -d);
-  g.add(B.glass([sink(wsClear, 0.003), sink(rgClear, 0.003), sink(doorGlass, 0.006), sink(qGlass, 0.005)], { tint: 0x16201f, outer: 0.5, inner: 0.1 }));
+  const dark = mods.tint === 'dark';
+  g.add(B.glass([sink(wsClear, 0.003)], { tint: 0x16201f, outer: 0.5, inner: 0.1 }));
+  g.add(B.glass([sink(rgClear, 0.003), sink(doorGlass, 0.006), sink(qGlass, 0.005)], dark ? { tint: 0x050607, outer: 0.82, inner: 0.3 } : { tint: 0x16201f, outer: 0.5, inner: 0.1 }));
   // rubber seals around the fixed glass and the belt line
   const sealProfile = [[-0.006, -0.004], [-0.002, 0.0015], [0.003, 0.0022], [0.006, -0.003]];
   const seals = [B.bead(ws, sealProfile), B.bead(rg, sealProfile), B.bead(qGlass, [[-0.003, -0.004], [0, 0.001], [0.004, 0.0012], [0.006, -0.004]])];
   // belt seal: the strip between door skin and glass
-  g.add(B.mesh([...seals, glassWall], mat.rubber(), { name: 'seals' }));
+  g.add(B.mesh([...(ctx.interior ? seals : []), glassWall], mat.rubber(), { name: 'seals' }));
 
   // ------------------------------------------------------------------ wheel wells
   for (const a of arches) g.add(B.mesh(B.wheelWell(S, { z: a.z, y: a.y, r: a.r + 0.004, xi, bottom: 0.15 }), mat.wellLiner(), { name: 'well' }));

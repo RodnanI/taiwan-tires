@@ -17,8 +17,10 @@ A vehicle file has two independent halves:
 2. **`model.build(ctx)`**: returns the 3D model (body + interior). Pure geometry: the runtime adds wheels,
    suspension motion, lights, gauges, steering animation and the menu screen.
 
-You can replace either half without touching the other. The current three cars are `placeholder: true`:
-their specs are final-ish, their models are prototypes to be replaced.
+You can replace either half without touching the other. The three hero cars (`hoshino-kaze86`, `tenmaru-rs4`,
+`yushan-typhoon`) are finished, detailed models built with the **body toolkit** below; read one of them before
+starting a new car. Each splits its model into `body.js` (exterior) and `cabin.js` (interior) next to
+`vehicle.js`. The template still uses the quick prototype presets.
 
 ## Coordinate frame (get this right first)
 
@@ -128,12 +130,14 @@ Return value:
 | `anchors.cockpit` | yes | Driver eye position `[x, y, z]` (`kit.presets.interior` returns it as `eye`). |
 | `anchors.hood`, `anchors.bumper` | no | Hood and bumper camera positions. |
 | `wheels` | no | Four custom wheels `[{ spin, hub? }]` (FL, FR, RL, RR, built for the left side, the runtime mirrors the right). Usually use `kit.wheels({...})` instead. |
-| `steeringWheel` | no | Object to rotate for steering, if you did not use `kit.interior.steeringWheel`. |
+| `steeringWheel` | no | Object to rotate for steering, if you did not use `kit.interior.steeringWheel` / `wheel2`. |
+| `animate` | no | `(dt, state) => void`, called every rendered frame. `state`: `{ lights, brake, reverse, speed, steer, throttle, rpm, night }`. Pop-up lamps, active aero, wipers. Keep it allocation-free. |
 
 The runtime registers automatically: headlights/brake/reverse/indicator lamps (from `kit.ext.headlight`,
-`kit.ext.taillight`), exhaust anchors (`kit.ext.exhaust`, for flames), the steering wheel
-(`kit.interior.steeringWheel`), live gauges (`kit.interior.cluster`) and **the head unit screen**
-(`kit.interior.headUnit`).
+`kit.ext.taillight` or any `kit.body.emitter(kind)` material), exhaust anchors (`kit.ext.exhaust` or pushes to
+`kit._anchors.exhaust`, for flames), the steering wheel (`kit.interior.steeringWheel` / `wheel2`), live gauges
+(`kit.interior.cluster`) and **the head unit screen** (`kit.interior.headUnit`, which also draws an in-game radio
+display while driving).
 
 ### The head unit screen matters
 
@@ -151,8 +155,10 @@ Materials (quality-aware, shared, never create raw three.js materials for common
 `kit.mat.emissive(color, intensity)`, `kit.mat.surface({...})`, `kit.mat.textured(key, {...})`.
 
 Helpers: `kit.mesh(geometry, material, { pos, rot, scale, shadow, receive, name })`, `kit.seg(n)`,
-`kit.wheels({ style, rimRatio, color, caliperColor, widthScale })` (override default wheels),
-`kit.buildWheel(opts)`.
+`kit.wheels({ style, rimRatio, color, caliperColor, widthScale, lugs, lipColor, finish, tyreBrand, whiteLetters })`
+(override default wheels), `kit.buildWheel(opts)`. Wheels have moulded sidewall lettering (size code from the
+spec), tread normals by compound, vented discs (cross-drilled from sport brakes up) and calipers that grow with
+the brake upgrade; they are built once per axle and cloned.
 
 Geometry (`kit.geo`, all return `BufferGeometry`):
 
@@ -173,14 +179,75 @@ Exterior (`kit.ext`): `headlight({ pos, size, shape: 'round'|'rect'|'slim'|'popu
 `wipers({ y, z, width })`, `antenna({ pos })`. Lights are placed for the left side (`pos[0] > 0`); call
 again with `-x` for the right.
 
-Interior (`kit.interior`): `seat`, `steeringWheel`, `dashboard`, `cluster({ type: 'analog2'|'digital', redline, maxRpm, maxSpeed })`,
-`headUnit`, `shifter({ type: 'h'|'seq' })`, `pedals`, `rollCage`, `rearViewMirror`.
-All take `{ pos: [x, y, z], ... }` in vehicle space.
+Interior (`kit.interior`): `seat`, `steeringWheel`, `dashboard`, `cluster`, `headUnit`, `shifter({ type: 'h'|'seq' })`,
+`pedals`, `rollCage`, `rearViewMirror`, and the detailed parts used by the hero cars:
+
+| Function | Use |
+|---|---|
+| `cluster({ pos, size, tilt, type, redline, maxRpm, maxSpeed, px, glow, glass, hood })` | Live gauges. `type`: `analog2`, `digital`, `analog3` (80s: fuel/temp stack, tach, speedo), `rally` (white dials, boost), `tft` (modern screen, accent colours). |
+| `seat2({ pos, w, len, h, back, recline, bolster, backBolster, headrest: 'separate'\|'integrated'\|'none', harness, insert, side, trim })` | Lofted seat with stitched insert and bolsters. A wide one is a rear bench. |
+| `wheel2({ pos, radius, tilt, style: '80s3'\|'sport3'\|'flat', grip, spoke, pad, accent, emblem, paddle, column })` | Steering wheel with a swept rim, spokes, horn pad, stalks; registers for steering. |
+| `vent({ pos, size, round, rot, slats, bezel })`, `knob({ pos, r, len, rot, mat })` | Air vents and rotary knobs. |
+| `shifter2({ pos, type: 'h'\|'seq'\|'short', knob: 'ball'\|'tall'\|'box', gears, lean, boot, knobMat })` | Gear lever with gaiter and an engraved shift pattern. |
+| `handbrake({ pos, hydro })`, `pedals2({ pos, sport, clutch })` | Lever or hydraulic handbrake; pedal box (aluminium pads when `sport`). |
+| `mat(textureKey, { color, roughness, repeat, normalScale })`, `leather(color, roughness)` | Shared textured trim materials: `grain`, `cloth80s`, `carpet`, `headliner`, `alcantara`, `perforated`, `quilted`, `speaker`. |
+
+All take positions in vehicle space.
 
 Presets (`kit.presets`, whole assemblies from a few numbers, good for prototypes):
 `cabin({ zA, zRF, zRR, zC, yBelt, yRoof, hwBelt, hwRoof, tint })` greenhouse,
 `interior({ driverX, floorY, seatY, seatZ, dashZ, dashY, halfWidth, cluster, headUnit, wheel, seats, cage, roofY })`
 returns `{ group, eye }`, `trimBand({ z0, z1, y, halfWidth, height })` bumpers and strips.
+
+## Body toolkit (`kit.body`)
+
+How the hero cars are built (`src/vehicles/kit/body.js`). The idea: one smooth closed **surface** lofted
+through a dozen or two cross-sections, then **cut** into real panels. Because every panel, glass pane and lamp
+lens comes out of the same surface, they sit flush by construction; the cuts leave shut lines, and rolled
+edges make the panels look pressed rather than sliced.
+
+```js
+const B = kit.body, sd = B.sd;
+// 1. stations: rounded half-sections from the bottom centreline round to the top centreline (x >= 0),
+//    the same corner count everywhere: [x, y, cornerSize]
+const S = B.loft([{ z: -2.0, pts: [[0, 0.3, 0.05], [0.7, 0.3, 0.03], ...] }, ...], {
+  fillet: [2, 3, 4, 4, 4, 6, 6], seg: [5, 1, 10, 8, 10, 11], rows: 190, displace: [flareFn],
+  lod: ctx.interior ? 1 : 0.7,                         // lighter AI / distant cars
+});
+// 2. regions are signed functions (metres, <= 0 inside), usually from the surface's own corner traces
+const onTop = (x, y, z) => Math.abs(x) - S.corner(5, z)[0];
+let body = B.hole(S.patch, archFn);                     // wheel arches
+let [ws, rest] = B.cut(body, windscreenFn, { gap: 0.007 });
+let [hood, rest2] = B.cut(rest, hoodFn);               // default 4 mm shut line
+// 3. finish: rolled edges, one mesh per material
+g.add(B.assemble({ paint: { patches: [hood, rest2], roll: { r: 0.0018, depth: 0.005 } } }, { paint: kit.paint }));
+g.add(B.glass([B.offset(ws, -0.003)], { tint: 0x16201f }));
+```
+
+| Function | Use |
+|---|---|
+| `loft(stations, opts)` | Closed surface `S`. `S.patch` (the mesh), `S.corner(k, z)` (corner k's [x, y] at z), `S.sideAt(z, y)`, `S.topAt(z, x)`, `S.sidePoint(z, y)` / `S.topPoint(z, x)` (point + normal). Corner coordinates are interpolated with a monotone cubic (no overshoot). `displace: [(x, y, z) => [dx, dy]]` adds flares, bulges, scallops. `capFront` / `capRear: { dome, rings, yc }`. |
+| `cut(p, f, { gap, r })` / `split(p, f, half)` / `hole(p, f)` / `keep(p, f)` / `clip(p, f)` | Exact, crack-free cuts along `f = 0`. `f(x, y, z, u, v)` also gets the uv, so swept parts (bumpers) can be cut by path length. Pieces share one vertex pool. |
+| `roll(p, { r, depth, only, splitWall })` | Rolled edge + return wall along open edges (`only(x, y, z)` filters; `splitWall` returns the wall separately, for dark insides of openings). `depth` can be a function. |
+| `bead(p, profile)` | Seal / trim strip along open edges (window rubbers). |
+| `sweep(path, profile, { closed, profileClosed, capStart, capEnd, sub, up, upFn, flip })` | Profile along a path: bumpers, wipers, gutters, rails, belts. `profile` may be `(s) => points` to taper. |
+| `offset`, `flip`, `warp`, `mirror`, `projectUV`, `boxUV`, `skirt`, `capLoops`, `merge` | Move along normals, invert, deform, mirror to the right side, metric uvs, lamp housings, caps. |
+| `assemble({ key: patches \| { patches, roll } }, { key: material })`, `mesh(patches, material)`, `from(geometry)` | Patches to meshes (merge everything that shares a material). |
+| `glass(patches, { tint, outer, inner })` | Two-sided window: reflective tint outside, nearly clear from the cockpit. |
+| `emitter(kind, color, base)` | Light material registered with the runtime: `head`, `brake`, `reverse`, `indicator`, `fog`, `drl`. |
+| `mat.*` | Shared car materials: `blackPlastic` (grained), `satinBlack`, `glossBlack`, `rubber`, `chrome`, `brightMetal`, `darkMetal`, `cavity`, `underbody`, `reflector`, `frit`, `wellLiner`, lenses `lensClear/Red/Amber/Smoke(optic, repeat)` with `lensOptic` / `lensRibs` / `lensFlutes` normal maps. |
+| `decal(patch, f, { axis, a0, b0, w, h, flipU, material })`, `textCanvas(text, opts)`, `decalMat(canvas, { key })` | Lettering and badges lying on the surface. Give shared ones a `key`. |
+| `doorMirror({ base, size, side, out, up, indicator, capMat })`, `wheelWell(S, { z, y, r, xi })`, `planPath(...)`, `project(patch, axis, a, b)` | Modern mirrors, arch liners clipped to the body, U-shaped plan paths for bumpers, ray-cast a point onto a lens to seat lamp internals. |
+| `trimShell(S, o)`, `floorPan(S, o)`, `dashSweep(half, prof)` | Cabin: door cards / pillar trims / headliner as the body surface pushed inwards (always fits), a carpeted floor pan, a dashboard swept across the car. |
+
+Rules of thumb that the hero cars follow:
+- Keep openings dark: cut wheel arches, grilles and vents with `roll(..., { splitWall: true })` and give the
+  wall `mat.blackPlastic()`; glass edges roll into rubber (`glassWall`), not paint.
+- Cut lamps from the surface before the panels so panel shut lines end at the lamp edges; seat projectors and
+  LED strips with `B.project` on the lens.
+- Everything that is not visible from outside (cabin, seals, floor details) should check `ctx.interior`.
+- Canvas textures (badges, gauges, charms) go through `M.shared(key, ...)` or `decalMat({ key })` so rebuilds in
+  the paint shop do not leak GPU textures.
 
 ## Visual customisation
 
@@ -195,9 +262,11 @@ visual: {
 },
 ```
 
-`rims` is special: its option ids are rim styles (`spoke5 mesh multi dish turbofan steelie split6`, see
-`src/vehicles/kit/wheels.js` `RIM_STYLES`) and the runtime builds them. Any other slot is yours to interpret
-in `build()`. The first option of each slot is the default.
+`rims` is special: its option ids are rim styles (`spoke5 mesh multi dish turbofan steelie split6 rays6 eight
+twin5 y5 aero`, see `src/vehicles/kit/wheels.js` `RIM_STYLES`) and the runtime builds them. Any other slot is
+yours to interpret in `build()`. The first option of each slot is the default. The hero cars read `tint`
+(side and rear glass only; the windscreen stays clear), `spoiler` / `wing`, `livery` (Kaze two-tone),
+`mudflaps` / `vortex` (RS-4) and `roof` / `mirrors` (Typhoon).
 
 ## Budgets
 
@@ -207,7 +276,8 @@ in `build()`. The first option of each slot is the default.
 | Meshes | under 600 (merge static parts) | under 200 |
 
 Share materials (`kit.mat.*` already does), merge geometry that shares a material, and scale tessellation
-with `kit.seg()`. The validator reports both numbers.
+with `kit.seg()`. The validator reports both numbers, warns past the budgets and fails on broken geometry
+(NaN positions or zero normals, which render black and can poison the HDR post chain).
 
 ## Definition of done for a detailed car
 

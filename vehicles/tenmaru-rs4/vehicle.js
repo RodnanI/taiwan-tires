@@ -1,7 +1,7 @@
+// Tenmaru RS-4 Type R (2006): turbo flat-four AWD rally saloon. Model: body.js (exterior) and cabin.js (interior);
+// see vehicles/AGENTS.md "Body toolkit".
 import { buildExterior } from './body.js';
 import { buildCabin } from './cabin.js';
-// PLACEHOLDER car (prototype geometry). Replace model.build with a detailed model; keep the specs block.
-// Archetype: rally-bred turbo AWD sedan. Boxer rumble, huge traction, loves wet mountain roads.
 export default {
   id: 'tenmaru-rs4',
   name: 'RS-4 Type R',
@@ -9,7 +9,6 @@ export default {
   year: 2006,
   country: 'JP',
   price: 1680000,
-  placeholder: true,
   tags: ['jdm', 'awd', 'turbo', 'rally'],
   description: 'Turbo flat-four, symmetrical AWD and a wing you can see from space. Point it at a wet hairpin and floor it.',
 
@@ -48,15 +47,18 @@ export default {
     paints: ['#1d3f8a', '#e7e5df', '#141518', '#8c9196', '#c8b12a'],
     slots: {
       rims: { name: 'Rims', zh: '輪框', options: [
-        { id: 'spoke5', name: '5-spoke gold', price: 0 }, { id: 'split6', name: 'Split 6', price: 39000 }, { id: 'multi', name: '10-spoke', price: 44000 }, { id: 'mesh', name: 'Cross mesh', price: 48000 }] },
+        { id: 'spoke5', name: '5-spoke gold', price: 0 }, { id: 'rays6', name: 'Forged 6-spoke', price: 52000 }, { id: 'twin5', name: 'Twin 5-spoke', price: 41000 },
+        { id: 'split6', name: 'Split 6', price: 39000 }, { id: 'multi', name: '10-spoke', price: 44000 }, { id: 'mesh', name: 'Cross mesh', price: 48000 }] },
       wing: { name: 'Wing', zh: '尾翼', options: [{ id: 'stock', name: 'Factory tall wing', price: 0 }, { id: 'none', name: 'Delete', price: 3000 }, { id: 'gt', name: 'Carbon GT wing', price: 32000 }] },
       tint: { name: 'Window tint', zh: '隔熱紙', options: [{ id: 'light', name: 'Light', price: 0 }, { id: 'dark', name: 'Dark', price: 6000 }] },
+      mudflaps: { name: 'Mud flaps', zh: '擋泥板', options: [{ id: 'on', name: 'Rally flaps', price: 0 }, { id: 'off', name: 'Removed', price: 0 }] },
+      vortex: { name: 'Roof fins', zh: '車頂導流鰭', options: [{ id: 'on', name: 'Black vortex fins', price: 0 }, { id: 'body', name: 'Body colour fins', price: 4000 }, { id: 'off', name: 'Removed', price: 0 }] },
     },
   },
 
   model: {
     build(ctx) {
-      const { THREE, kit, parts, interior } = ctx;
+      const { THREE, kit, interior } = ctx;
       const body = new THREE.Group();
       kit.wheels({ rimRatio: 0.69, lugs: 5, color: 0xc9a54a, caliperColor: 0xc4161c });
       const ex = buildExterior(ctx);
@@ -67,7 +69,7 @@ export default {
         body.add(cab.group);
         eye = cab.eye;
       }
-      return { body, anchors: { cockpit: eye, hood: [0, 1.13, 0.75], bumper: [0, 0.5, 2.3] } };
+      return { body, anchors: { cockpit: eye, hood: [0, 1.11, 1.02], bumper: [0, 0.5, 2.3] } };
     },
   },
 };

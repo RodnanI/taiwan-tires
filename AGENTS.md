@@ -68,9 +68,10 @@ dist/           taiwan-tires.html, the shipped game (committed)
 tmp/            screenshots and scratch output (git-ignored)
 ```
 
-## Current state (foundation phase)
+## Current state (phase 1 done)
 
-All engine systems are in place and working. The three cars and the one map are **placeholders**
-(`placeholder: true`): low-detail prototype models and a compact test map (Kaohsiung Harbor) that exercises
-every system. The remaining work is content: detailed car models with interiors and the three real maps
-(countryside, mountain, downtown Taipei). See `ROADMAP.md`.
+All engine systems are in place and working. The three hero cars are finished, detailed models with full
+interiors, built with the body toolkit (`kit.body`, see `vehicles/AGENTS.md`). The one map is still a
+**placeholder** (`placeholder: true`): a compact test map (Kaohsiung Harbor) that exercises every system. The
+remaining work is content: the three real maps (countryside, mountain, downtown Taipei), then more cars. See
+`ROADMAP.md`.

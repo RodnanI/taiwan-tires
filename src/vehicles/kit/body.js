@@ -800,7 +800,7 @@ export function makeBodyKit(kit) {
     Patch, clip, split, offset, flip, warp, mirror, roll, skirt, boundary, chains, boxUV, projectUV, sd, lookup, curve, monotone, sweep, bead, smooth3,
     fromGeometry, toGeometry, computeNormals, merge: mergePatches,
     /** Lofted body surface (see loftBody). Counts scale with the detail setting. */
-    loft: (stations, opts = {}) => loftBody(stations, { segFn: (n) => Math.max(1, n * kit.detail), ...opts }),
+    loft: (stations, opts = {}) => loftBody(stations, { segFn: (n) => Math.max(1, n * kit.detail * (opts.lod ?? 1)), ...opts }),
     /**
      * Cut a patch in two along f = 0 leaving a shut-line gap: returns [inside (f < 0), outside (f > 0)].
      * The visible gap is `gap`; rolls added later by assemble() eat `r` on each side.

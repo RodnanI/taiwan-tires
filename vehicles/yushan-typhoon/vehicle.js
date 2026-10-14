@@ -1,7 +1,7 @@
+// Yushan Typhoon GT (2019): front-engine V8 grand tourer from Taiwan's fictional supercar maker. Model: body.js
+// (exterior) and cabin.js (interior); see vehicles/AGENTS.md "Body toolkit".
 import { buildExterior } from './body.js';
 import { buildCabin } from './cabin.js';
-// PLACEHOLDER car (prototype geometry). Replace model.build with a detailed model; keep the specs block.
-// Archetype: front-engine V8 grand tourer. Long hood, fastback, lazy torque that lights the rears anywhere.
 export default {
   id: 'yushan-typhoon',
   name: 'Typhoon GT',
@@ -9,7 +9,6 @@ export default {
   year: 2019,
   country: 'TW',
   price: 2950000,
-  placeholder: true,
   tags: ['v8', 'gt', 'rwd', 'highway'],
   description: 'Five litres of naturally aspirated V8 from Taiwan\'s own fictional supercar maker. Fast on the expressway, sideways everywhere else.',
 
@@ -44,15 +43,18 @@ export default {
     paints: ['#b3261e', '#101113', '#d7d5cf', '#3f5a3a', '#c98c1f'],
     slots: {
       rims: { name: 'Rims', zh: '輪框', options: [
-        { id: 'multi', name: '10-spoke forged', price: 0 }, { id: 'spoke5', name: '5-spoke', price: 30000 }, { id: 'turbofan', name: 'Turbofan', price: 52000 }, { id: 'mesh', name: 'Cross mesh', price: 50000 }] },
+        { id: 'multi', name: '10-spoke forged', price: 0 }, { id: 'y5', name: 'Y-spoke', price: 46000 }, { id: 'aero', name: 'Aero disc', price: 58000 },
+        { id: 'spoke5', name: '5-spoke', price: 30000 }, { id: 'turbofan', name: 'Turbofan', price: 52000 }, { id: 'mesh', name: 'Cross mesh', price: 50000 }] },
       spoiler: { name: 'Spoiler', zh: '尾翼', options: [{ id: 'ducktail', name: 'Ducktail', price: 0 }, { id: 'none', name: 'Smooth', price: 0 }, { id: 'swan', name: 'Swan-neck wing', price: 48000 }] },
       tint: { name: 'Window tint', zh: '隔熱紙', options: [{ id: 'dark', name: 'Dark', price: 0 }, { id: 'light', name: 'Light', price: 0 }] },
+      roof: { name: 'Roof', zh: '車頂', options: [{ id: 'body', name: 'Body colour', price: 0 }, { id: 'gloss', name: 'Gloss black', price: 12000 }, { id: 'carbon', name: 'Exposed carbon', price: 38000 }] },
+      mirrors: { name: 'Mirror caps', zh: '後視鏡蓋', options: [{ id: 'body', name: 'Body colour', price: 0 }, { id: 'carbon', name: 'Carbon', price: 9000 }] },
     },
   },
 
   model: {
     build(ctx) {
-      const { THREE, kit, parts, interior } = ctx;
+      const { THREE, kit, interior } = ctx;
       const body = new THREE.Group();
       kit.wheels({ rimRatio: 0.74, lugs: 5, color: 0x2a2b2e, caliperColor: 0xd8b02a });
       const ex = buildExterior(ctx);
@@ -63,7 +65,7 @@ export default {
         body.add(cab.group);
         eye = cab.eye;
       }
-      return { body, anchors: { cockpit: eye, hood: [0, 1.0, 0.25], bumper: [0, 0.45, 2.38] } };
+      return { body, anchors: { cockpit: eye, hood: [0, 0.99, 0.56], bumper: [0, 0.45, 2.4] } };
     },
   },
 };

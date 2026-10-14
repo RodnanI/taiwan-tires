@@ -69,7 +69,7 @@ export function buildCabin(ctx, ex) {
     const dash = (x) => {
       const yf = Math.min(0.985, S.topAt(zf, x) - 0.03);
       const a = [[1.05, 0.6], [0.83, 0.6], [0.72, 0.65], [0.665, 0.72], [0.648, 0.8], [0.646, 0.86], [0.655, 0.905], [0.69, 0.94], [0.76, 0.962], [0.86, 0.972], [zf, yf], [1.02, yf - 0.06]];
-      const b = [[1.05, 0.6], [0.83, 0.6], [0.72, 0.65], [0.665, 0.72], [0.648, 0.8], [0.68, 0.875], [0.73, 0.88], [0.745, 0.9], [0.76, 1.02], [0.86, 1.02], [zf, yf], [1.02, yf - 0.06]];
+      const b = [[1.05, 0.6], [0.83, 0.6], [0.72, 0.65], [0.665, 0.72], [0.648, 0.8], [0.68, 0.875], [0.73, 0.88], [0.745, 0.9], [0.76, 1.045], [0.86, 1.045], [zf, Math.max(yf, 1.0)], [1.02, yf - 0.06]];
       const w = ss(DX - 0.2, DX - 0.165, x) * ss(DX + 0.2, DX + 0.165, x);
       return a.map((p, i) => [p[0] + (b[i][0] - p[0]) * w, p[1] + (b[i][1] - p[1]) * w]);
     };
@@ -87,11 +87,11 @@ export function buildCabin(ctx, ex) {
     // cluster binnacle and dials
     const bin = [];
     for (let i = 0; i <= 16; i++) bin.push([DX + 0.2 - (0.4 * i) / 16, 0, 0]);
-    const hood = [[0.82, 0.96], [0.81, 1.02], [0.76, 1.048], [0.69, 1.052], [0.635, 1.04], [0.615, 1.018], [0.62, 1.005], [0.645, 1.016], [0.69, 1.028], [0.75, 1.025], [0.79, 1.005], [0.8, 0.96]];
+    const hood = [[0.82, 0.985], [0.81, 1.045], [0.76, 1.073], [0.69, 1.077], [0.635, 1.065], [0.615, 1.043], [0.62, 1.03], [0.645, 1.041], [0.69, 1.053], [0.75, 1.05], [0.79, 1.03], [0.8, 0.985]];
     g.add(B.mesh([B.sweep(bin, hood, { up: [0, 1, 0], profileClosed: true, capStart: true, capEnd: true, flip: true })], M.shared('rs4:binnacle', () => M.surface({ color: 0x18191b, roughness: 0.82 })), { name: 'binnacle' }));
     const rec = new THREE.Mesh(kit.geo.box(0.38, 0.15, 0.005), M.shared('rs4:recess', () => M.surface({ color: 0x0a0a0b, roughness: 0.9 })));
-    rec.position.set(DX, 0.955, 0.765); g.add(rec);
-    g.add(I.cluster({ pos: [DX, 0.952, 0.752], size: [0.34, 0.12], tilt: 10, type: 'rally', redline: ctx.spec.engine.redline, maxRpm: 9000, maxSpeed: 280, accent: kit.accent, hood: false, px: 768, glow: 0.24, glass: true }));
+    rec.position.set(DX, 0.98, 0.765); g.add(rec);
+    g.add(I.cluster({ pos: [DX, 0.978, 0.752], size: [0.34, 0.12], tilt: 10, type: 'rally', redline: ctx.spec.engine.redline, maxRpm: 9000, maxSpeed: 280, accent: kit.accent, hood: false, px: 768, glow: 0.24, glass: true }));
     // vents: round at the ends, rectangular pair above the head unit
     for (const sx of [1, -1]) g.add(I.vent({ pos: [sx * 0.66, 0.9, 0.66], size: [0.09, 0.09], round: true, rot: [0, sx * 0.3, 0] }));
     for (const sx of [1, -1]) g.add(I.vent({ pos: [sx * 0.06, 0.885, 0.632], size: [0.1, 0.045], rot: [0, Math.PI, 0] }));
@@ -131,7 +131,7 @@ export function buildCabin(ctx, ex) {
     e.add(disc);
     return e;
   };
-  g.add(I.wheel2({ pos: [DX, 0.955, 0.47], radius: 0.183, tilt: 22, style: 'sport3', grip: I.leather(0x141414, 0.45), spoke: silver, pad: M.shared('rs4:hub', () => M.surface({ color: 0x151517, roughness: 0.5 })), accent: blueLeather, emblem, column: 0.2 }));
+  g.add(I.wheel2({ pos: [DX, 0.935, 0.47], radius: 0.183, tilt: 24, style: 'sport3', grip: I.leather(0x141414, 0.45), spoke: silver, pad: M.shared('rs4:hub', () => M.surface({ color: 0x151517, roughness: 0.5 })), accent: blueLeather, emblem, column: 0.2 }));
   g.add(I.pedals2({ pos: [DX, 0.43, 0.86], sport: true }));
   {
     const pod = new THREE.Group();
@@ -139,12 +139,16 @@ export function buildCabin(ctx, ex) {
     pod.position.set(px, py, 0.8);
     pod.lookAt(eye[0], eye[1], eye[2]);
     pod.add(new THREE.Mesh(kit.geo.latheZ([[0.034, -0.05], [0.034, 0.0], [0.03, 0.004]], 20), satin));
-    const fc = B.canvas(256, 256), fg = fc.getContext('2d');
-    fg.fillStyle = '#0a0a0b'; fg.beginPath(); fg.arc(128, 128, 126, 0, Math.PI * 2); fg.fill();
-    fg.strokeStyle = '#e8e6e0'; fg.lineWidth = 6; fg.fillStyle = '#e8e6e0'; fg.font = `700 26px ${B.fonts.ui}`; fg.textAlign = 'center';
-    for (let i = 0; i <= 10; i++) { const a = Math.PI * 0.75 + (i / 10) * Math.PI * 1.5; fg.beginPath(); fg.moveTo(128 + Math.cos(a) * 92, 128 + Math.sin(a) * 92); fg.lineTo(128 + Math.cos(a) * 112, 128 + Math.sin(a) * 112); fg.stroke(); }
-    fg.fillText('BOOST', 128, 180); fg.fillStyle = '#e0251b'; fg.fillRect(124, 60, 8, 70);
-    const face = new THREE.Mesh(new THREE.CircleGeometry(0.03, 24), M.surface({ color: 0xffffff, map: B.tex(fc), emissive: 0xffffff, emissiveMap: B.tex(fc), emissiveIntensity: 0.3, roughness: 0.4 }));
+    const podM = M.shared('rs4:boostPod', () => {
+      const fc = B.canvas(256, 256), fg = fc.getContext('2d');
+      fg.fillStyle = '#0a0a0b'; fg.beginPath(); fg.arc(128, 128, 126, 0, Math.PI * 2); fg.fill();
+      fg.strokeStyle = '#e8e6e0'; fg.lineWidth = 6; fg.fillStyle = '#e8e6e0'; fg.font = `700 26px ${B.fonts.ui}`; fg.textAlign = 'center';
+      for (let i = 0; i <= 10; i++) { const a = Math.PI * 0.75 + (i / 10) * Math.PI * 1.5; fg.beginPath(); fg.moveTo(128 + Math.cos(a) * 92, 128 + Math.sin(a) * 92); fg.lineTo(128 + Math.cos(a) * 112, 128 + Math.sin(a) * 112); fg.stroke(); }
+      fg.fillText('BOOST', 128, 180); fg.fillStyle = '#e0251b'; fg.fillRect(124, 60, 8, 70);
+      const t = B.tex(fc);
+      return M.surface({ color: 0xffffff, map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.3, roughness: 0.4 });
+    });
+    const face = new THREE.Mesh(new THREE.CircleGeometry(0.03, 24), podM);
     face.position.z = 0.002;
     pod.add(face);
     g.add(pod);

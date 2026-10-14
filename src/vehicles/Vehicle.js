@@ -76,6 +76,7 @@ export class Vehicle {
         const o = { radius: c.radius, width: c.width / 1000, rimRadius: c.radius * (kit._wheelOverride?.rimRatio ?? 0.66), style: rimStyle, color: visual.rimColor ?? kit._wheelOverride?.color, caliperColor: kit._wheelOverride?.caliperColor, ...(kit._wheelOverride || {}) };
         o.style = rimStyle;
         o.front = front;
+        o.detail = this.detail * (this.withInterior ? 1 : 0.75); // AI and ghost cars get lighter wheels
         o.compound = this.spec.tires?.compound;
         if (o.brake == null) o.brake = { street: 1, sport: 2, race: 3 }[this.config.parts?.brakes] ?? 0;
         o.width = c.width / 1000 * (kit._wheelOverride?.widthScale ?? 1);
