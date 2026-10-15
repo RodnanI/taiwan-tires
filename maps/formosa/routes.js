@@ -66,8 +66,20 @@ function buildRing() {
 export const RING = buildRing();
 
 // ------------------------------------------------------------------------------------------- mountains
-export const TOUGE = TR.TOUGE;
 export const QIXING_LOOP = TR.QIXING_LOOP;
+// Yangming Road: the traced climb, then the last 350 m run east under the loop embankment and meet the loop
+// at a T in its low point (the traced end reached the loop 24 m below it). The grade eases from the climb's
+// 10 % to level at the junction.
+export const TOUGE_JUNCTION = TR.QIXING_LOOP[30];
+export const TOUGE = (() => {
+  const keep = 148, head = TR.TOUGE.slice(0, keep + 1), a = head[keep], J = TOUGE_JUNCTION;
+  const tail = fillet([[a[0], a[2]], [-320, -650], [J[0], J[2]]], [0, 45, 0], { step: 12 });
+  const d = cumDist(tail.map((p) => [p[0], 0, p[1]])), L = d[d.length - 1];
+  const m0 = (a[1] - head[keep - 1][1]) / Math.hypot(a[0] - head[keep - 1][0], a[2] - head[keep - 1][2]);
+  const k = m0 * L / (J[1] - a[1]), b = 0.05;                     // cubic ease: slope k at the start, b at the end
+  const ease = (t) => k * t + (3 - 2 * k - b) * t * t + (k + b - 2) * t * t * t;
+  return [...head, ...tail.slice(1).map((p, i) => [p[0], +(a[1] + (J[1] - a[1]) * ease(d[i + 1] / L)).toFixed(2), p[1]])];
+})();
 const loopAt = (k) => TR.QIXING_LOOP[TR.QIXING_STATIONS[k]];
 const nearestOn = (pts, x, z) => { let b = null, bd = Infinity; for (const q of pts) { const d = Math.hypot(q[0] - x, q[2] - z); if (d < bd) { bd = d; b = q; } } return b; };
 
@@ -78,6 +90,7 @@ const nearestOn = (pts, x, z) => { let b = null, bd = Infinity; for (const q of 
 function buildJiufen() {
   const a = nearestOn(RING.pts, 1690, -1795);
   const stack = belt([a[0], a[2]], [
+    [1636.5, -1814.8, 40, 'R'],  // leave the ring at 35 degrees, then swing west under the town
     [1290, -1732, 27, 'L'],      // H1
     [1760, -1677, 27, 'R'],      // H2
     [1300, -1622, 27, 'L'],      // H3
@@ -88,8 +101,8 @@ function buildJiufen() {
     [460, -1250], [300, -1300], [160, -1215], [20, -1250], [-110, -1310], [loopJ[0], loopJ[2]]],
   [0, 120, 200, 110, 120, 120, 130, 120, 130, 110, 90, 50, 0], { step: 14 });
   const pts = chain(stack, ridge);
-  // heights per station: ring, H1..H4, leg end | street, street end, ridge bends..., loop
-  const ys = [a[1], 52, 99, 146, 192, 214, 228, 232, 236, 238, 240, 244, 256, 266, 280, 296, 310, loopJ[1]];
+  // heights per station: ring, the swing west, H1..H4, leg end | street, street end, ridge bends..., loop
+  const ys = [a[1], 14, 52, 99, 146, 192, 214, 228, 232, 236, 238, 240, 244, 256, 266, 280, 296, 310, loopJ[1]];
   return { pts: stationHeights(pts, ys, 9), from: a, to: loopJ };
 }
 export const JIUFEN_ROAD = buildJiufen();
@@ -123,17 +136,39 @@ export const GUANDU = (() => {
 })();
 export const GUANDU_BRIDGE = { from: 40, to: 520 };
 // Yehliu: out along the sandstone cape to the geopark car park.
-export const YEHLIU = (() => {
-  const a = nearestOn(RING.pts, 30, -1920);
-  return fillet([[a[0], a[2]], [42, -2030], [26, -2120], [20, -2175]], [0, 60, 80, 0], { step: 10 }).map((p) => [p[0], p[1]]);
-})();
-// Riverside park: down the levee from Heping corner to the flats under the city, then north along the river.
+const YEHLIU_FROM = nearestOn(RING.pts, 30, -1920);
+export const YEHLIU = fillet([[YEHLIU_FROM[0], YEHLIU_FROM[2]], [42, -2030], [26, -2120], [20, -2175]], [0, 60, 80, 0], { step: 10 }).map((p) => [p[0], p[1]]);
+// Riverside park: down the levee from Heping corner to the flats under the city, then north along the river to
+// the big riverside car park (the drift venue) where it ends.
+export const RIVER_PARK = { x0: -1906, x1: -1832, z0: 1168, z1: 1546, y: 3.12 };
 export const RIVERSIDE = (() => {
   const a = nearestOn(RING.pts, -1765, 1920);
-  const p2 = fillet([[a[0], a[2]], [-1830, 1930], [-1868, 1860], [-1868, 1500], [-1868, 1150]], [0, 30, 40, 0, 0], { step: 12 });
+  const p2 = fillet([[a[0], a[2]], [-1830, 1930], [-1868, 1860], [-1868, 1700], [-1868, RIVER_PARK.z1]], [0, 30, 40, 0, 0], { step: 12 });
   let d = 0;
   return p2.map((p, i) => { if (i) d += Math.hypot(p[0] - p2[i - 1][0], p[1] - p2[i - 1][1]); return [p[0], +(Math.max(3.1, 10 - d * 0.075)).toFixed(2), p[1], 10]; });
 })();
+
+// Dongshan farm road: a concrete lane from the valley highway across to the rally loop's east dike.
+const LINK_RING = nearestOn(RING.pts, 1765, 900);
+export const FARM_LINK = [[1649, 900], [1700, 901], [LINK_RING[0], LINK_RING[2]]];
+
+// Fishing harbour: the quay apron sits under the ring at 5 m; a ramp drops to it from the east.
+export const HARBOUR = { x0: 1395, x1: 1712, zq: -1893, y: 5.0, rampZ: -1849 };
+const RAMP_FROM = nearestOn(RING.pts, 1765, -1814);
+export const HARBOUR_RAMP = [[RAMP_FROM[0], RAMP_FROM[1], RAMP_FROM[2]], [1746, 7.9, -1830], [1726, 6.0, -1843], [HARBOUR.x1, HARBOUR.y + 0.01, HARBOUR.rampZ]];
+
+/** Junction patches outside the city grid: bent to the roads on a grade. */
+export const JUNCTIONS = [
+  { pos: TOUGE_JUNCTION.slice(0, 3), radius: 12, fit: true },
+  { pos: JIUFEN_ROAD.to.slice(0, 3), radius: 12, fit: true },
+  { pos: JIUFEN_ROAD.from.slice(0, 3), radius: 13, fit: true },
+  { pos: YEHLIU_FROM.slice(0, 3), radius: 12, fit: true },
+  { pos: RIVERSIDE[0].slice(0, 3), radius: 12, fit: true },
+  { pos: GUANDU[0].slice(0, 3), radius: 13, fit: true },
+  { pos: LINK_RING.slice(0, 3), radius: 11, fit: true },
+  { pos: FARM_LINK[0], radius: 8, fit: true, surface: 'gravel' },
+  { pos: RAMP_FROM.slice(0, 3), radius: 10, fit: true },
+];
 
 // ------------------------------------------------------------------------------------------- corridors
 // Terrain follows these road profiles (bench = full strength half width, fall = blend distance).

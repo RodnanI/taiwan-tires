@@ -37,7 +37,6 @@ export function buildCity(kit, r, shared) {
   const ctx = { kit, rand: r, wallB, vsigns, hsigns, keepOut: shared.keepOut, vsign: (rr) => VS[Math.floor(rr() * VS.length)], hsign: (rr) => HS[Math.floor(rr() * HS.length)], signB: true };
   shared.city = { atlas, wallB, ctx };
 
-  const roadHalf = (id) => (EW.find((a) => a.id === id) || NS.find((a) => a.id === id))?.w / 2 ?? 7;
   const xs = [{ x: LEVEE_X, w: 12 }, ...NS.map((a) => ({ x: a.x, w: a.w }))];
   const zs = [...EW.filter((a) => a.z < HEPING_Z).map((a) => ({ z: a.z, w: a.w })), { z: HEPING_Z, w: 12 }, ...EW.filter((a) => a.z > HEPING_Z).map((a) => ({ z: a.z, w: a.w }))];
   const lots = [];

@@ -104,5 +104,6 @@ export function cityJunctions() {
   }
   for (const E of EW) if (E.x0 === LEVEE_X) add(LEVEE_X, E.z, E.w * 0.5 + 10);   // T into the ring on the levee
   for (const N of NS) add(N.x, HEPING_Z, N.w * 0.5 + 10);                         // across the ring on Heping
+  add(LEVEE_X, ELEVATED_Z, 18); add(ELEVATED_X, HEPING_Z, 18);                       // the elevated's two ends
   return J;
 }

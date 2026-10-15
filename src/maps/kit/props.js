@@ -5,7 +5,7 @@ import { makeCanvas } from '../../core/canvas.js';
 import { canvasTexture } from '../../render/textures.js';
 
 export const PROP_NAMES = ['lampPole', 'lampArm', 'railPost', 'palm', 'tree', 'bush', 'cone', 'waterBarrier', 'container20', 'container40', 'scooter', 'pillar', 'mirror', 'trafficLight', 'vending', 'bollard', 'waterTank', 'acUnit', 'cage', 'crate', 'drum', 'bench', 'busStop', 'betelStand', 'powerPole',
-  'betelPalm', 'banana', 'cedar', 'broadleaf', 'banyan', 'cherry', 'bamboo', 'silvergrass', 'shrub', 'rock', 'lantern', 'chevron', 'parkedCar', 'shrine', 'stall', 'umbrella'];
+  'canopy', 'betelPalm', 'banana', 'cedar', 'broadleaf', 'banyan', 'cherry', 'bamboo', 'silvergrass', 'shrub', 'rock', 'lantern', 'chevron', 'parkedCar', 'shrine', 'stall', 'umbrella'];
 
 // bend a plane along its length (fronds, leaves): z drops with the square of the distance from the base
 function frond(w, len, droop, segs = 3) {
@@ -180,6 +180,8 @@ export function makeProps(kit) {
       for (let i = 0; i < 5; i++) { const b = frond(0.22, 1.7, 0.55, 2); b.rotateX(-0.25 - (i % 2) * 0.2); b.rotateY((i / 5) * Math.PI * 2); blades.push(b); }
       return [P(kit.merge(blades), mat.foliage(), false)];
     },
+    // distant forest fill: a clump of canopy with no trunk (reads as woodland from the road, costs 40 triangles)
+    canopy: () => { const a = new THREE.IcosahedronGeometry(4.2, 0); a.scale(1.25, 0.8, 1.1); a.translate(0, 3.6, 0); const b = new THREE.IcosahedronGeometry(3.2, 0); b.scale(1, 0.85, 1.2); b.translate(3.6, 3.4, 1.4); return [P(kit.merge([a, b]), mat.foliageSolid())]; },
     shrub: () => { const g = new THREE.IcosahedronGeometry(1, 0); g.scale(1.3, 0.75, 1.2); g.translate(0, 0.55, 0); return [P(g, mat.foliageSolid(), false)]; },
     rock: () => { const g = new THREE.DodecahedronGeometry(1, 0); g.scale(1.3, 0.7, 1); g.translate(0, 0.35, 0); return [P(g, mat.rock())]; },
     lantern: () => {
@@ -220,7 +222,7 @@ export function makeProps(kit) {
     powerPole: () => { const g = new THREE.CylinderGeometry(0.14, 0.2, 10, 8); g.translate(0, 5, 0); const c = new THREE.BoxGeometry(2.2, 0.12, 0.12); c.translate(0, 9.3, 0); return [P(kit.merge([g, c]), M.shared('wood', () => M.surface({ color: 0x6b5b4a, roughness: 0.95 })))]; },
   };
   // big sets of small things stop drawing beyond these distances (scaled by the preset's draw distance)
-  const CULL = { betelPalm: 1100, banana: 500, cedar: 1300, broadleaf: 1100, banyan: 900, cherry: 800, bamboo: 700, silvergrass: 260, shrub: 380, rock: 700, lantern: 500, chevron: 420, parkedCar: 520, scooter: 300, stall: 500, umbrella: 400, acUnit: 380, cage: 380, waterTank: 900, bush: 450, railPost: 600, tunnelLamp: 650 };
+  const CULL = { canopy: 1500, betelPalm: 1100, banana: 500, cedar: 1300, broadleaf: 1100, banyan: 900, cherry: 800, bamboo: 700, silvergrass: 260, shrub: 380, rock: 700, lantern: 500, chevron: 420, parkedCar: 520, scooter: 300, stall: 500, umbrella: 400, acUnit: 380, cage: 380, waterTank: 900, bush: 450, railPost: 600, tunnelLamp: 650 };
   function ensure(name) {
     if (lazy.has(name)) return;
     const d = DEFS[name];
@@ -233,7 +235,7 @@ export function makeProps(kit) {
 
   const props = {
     names: PROP_NAMES,
-    define(name, parts, opts) { if (lazy.has(name)) return; DEFS[name] = () => parts; ensure(name); },
+    define(name, parts, opts = {}) { if (lazy.has(name)) return; DEFS[name] = () => parts; if (opts.maxDistance) CULL[name] = opts.maxDistance; ensure(name); },
     has(name) { return lazy.has(name) || !!DEFS[name]; },
     /** Place an instanced prop. scale: number | [x,y,z]. Adds a collider for blocking props. */
     place(name, pos, rotY = 0, scale = 1, color = null, { collide = true } = {}) {

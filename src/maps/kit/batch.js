@@ -10,8 +10,9 @@ const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vect
 export class Instancer {
   /** cell: instances of a big, spread-out prop set are split into cells of this size (m) so frustum and
    *  distance culling work per cell instead of drawing every instance of the map every frame. */
-  constructor(root, { cell = 420, splitAt = 160 } = {}) { this.root = root; this.types = new Map(); this.cell = cell; this.splitAt = splitAt; this.culled = []; }
-  /** Define a prop type made of parts [{ geometry, material, castShadow }]. maxDistance hides far cells. */
+  constructor(root, { cell = 560, splitAt = 160 } = {}) { this.root = root; this.types = new Map(); this.cell = cell; this.splitAt = splitAt; this.culled = []; }
+  /** Define a prop type made of parts [{ geometry, material, castShadow, tint }]. tint: false keeps a part
+   *  out of the instance colour (a boat's lamps, a lantern's tassel). maxDistance hides far cells. */
   define(name, parts, { castShadow = true, receiveShadow = false, maxDistance = Infinity } = {}) {
     if (!this.types.has(name)) this.types.set(name, { parts, castShadow, receiveShadow, maxDistance, matrices: [], colors: [] });
     return name;
@@ -44,7 +45,7 @@ export class Instancer {
       for (const ids of groups) for (const part of t.parts) {
         const mesh = new THREE.InstancedMesh(part.geometry, part.material, ids.length);
         ids.forEach((id, k) => mesh.setMatrixAt(k, t.matrices[id]));
-        if (tinted) ids.forEach((id, k) => mesh.setColorAt(k, col.set(t.colors[id] ?? 0xffffff)));
+        if (tinted && part.tint !== false) ids.forEach((id, k) => mesh.setColorAt(k, col.set(t.colors[id] ?? 0xffffff)));
         mesh.instanceMatrix.needsUpdate = true;
         mesh.castShadow = part.castShadow ?? t.castShadow;
         mesh.receiveShadow = t.receiveShadow;

@@ -71,6 +71,20 @@ export function createMapKit({ root, world, M, lights, env, quality, seed = 1, b
   kit.road = (spec) => roads.road(spec);
   kit.junction = (spec) => roads.junction(spec);
   kit.sweep = roads.sweep;
+  kit.roadMats = roads.mats;
+  /** Paved pad (car park, quay, plaza): flattens the terrain to y and lays a polygon [[x, z], ...] of asphalt,
+   *  concrete or gravel with collision. Call from build() (the terrain is meshed in finalize). */
+  kit.pad = ({ poly, y, surface = 'asphalt', blend = 8, material = null }) => {
+    kit.terrainRef?.flatten(poly, y, blend);
+    const g = new THREE.ShapeGeometry(new THREE.Shape(poly.map(([x, z]) => new THREE.Vector2(x, -z))));
+    g.rotateX(-Math.PI / 2);
+    g.translate(0, y + 0.03, 0);
+    const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 8, uv.getY(i) / 8);
+    const mat = material || (surface === 'concrete' ? roads.mats.concrete() : surface === 'gravel' || surface === 'dirt' ? M.textured('dirt', { repeat: 1 }) : roads.mats.asphalt());
+    kit.addStatic(g, mat, { cast: false, receive: true });
+    kit.collision.triangles(g, surface);
+    return g;
+  };
   const B = makeBuildings(kit);
   kit.building = B.building; kit.row = B.row; kit.skyline = B.skyline; kit.supertall = B.supertall;
   kit.props = makeProps(kit);

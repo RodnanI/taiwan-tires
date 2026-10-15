@@ -8,6 +8,7 @@ import { Route, resamplePath } from '../Route.js';
 import { clamp } from '../../core/math.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
+const smooth01 = (t) => t * t * (3 - 2 * t);
 
 /** Normalize a segment spec: true/object -> whole road, array -> as given, falsy -> none. */
 const segList = (v) => (Array.isArray(v) ? v : v ? [{ from: 0, to: Infinity, ...(typeof v === 'object' ? v : {}) }] : []);
@@ -27,12 +28,22 @@ export function roadRoute(spec, groundY = () => 0) {
   // smooth elevation (unless the author pinned exact heights)
   if (spec.smoothY !== false) {
     const n = samples.length, passes = spec.smoothPasses ?? 6, win = 5;
+    const orig = samples.map((s) => s[1]);
     for (let pass = 0; pass < passes; pass++) {
       const y = samples.map((s) => s[1]);
       for (let i = 0; i < n; i++) {
         let sum = 0, c = 0;
         for (let k = -win; k <= win; k++) { const j = spec.closed ? (i + k + n) % n : clamp(i + k, 0, n - 1); sum += y[j]; c++; }
         samples[i][1] = sum / c;
+      }
+    }
+    // open roads keep their exact end heights (they meet other roads there), easing into the smoothed profile
+    if (!spec.closed) {
+      const W = Math.min(Math.floor(n / 2), win * passes);
+      for (let i = 0; i < W; i++) {
+        const t = smooth01(i / W);
+        samples[i][1] = orig[i] + (samples[i][1] - orig[i]) * t;
+        samples[n - 1 - i][1] = orig[n - 1 - i] + (samples[n - 1 - i][1] - orig[n - 1 - i]) * t;
       }
     }
   }
@@ -161,7 +172,9 @@ export function makeRoads(kit) {
         else if (segAt(bridges, d) && route.y[i] - kit.rawGroundY(route.x[i], route.z[i]) > 1.2) skip[i] = 1;
       }
     }
-    kit.terrainRef?.carve(route, (sh?.width || 0) + 1.5, spec.carveBlend ?? 14, skip);
+    // full-strength carve reaches a cell and a bit past the shoulder: every terrain triangle that touches the
+    // road surface then has all three corners at road height, so hills cannot poke through on a crest or cut
+    kit.terrainRef?.carve(route, (sh?.width || 0) + Math.max(1.5, (kit.terrainRef?.cell ?? 4) * 1.2), spec.carveBlend ?? 14, skip);
     const r = { id: spec.id || `road${roads.length}`, spec, route, rows, width, shoulder: sh?.width || 0, tag: spec.tag || 'road', bridges, tunnels };
     roads.push(r);
     return r;
@@ -194,14 +207,49 @@ export function makeRoads(kit) {
   }
 
   /** Flat patch that hides overlapping road ribbons at a junction and cuts markings / walls around it.
-   *  pos: [x, z] (height from the ground) or [x, y, z] (exact road height, needed on slopes and decks). */
-  function junction({ pos, radius = 12, surface = 'asphalt', shape = 'round' }) {
-    const y = pos.length === 3 ? pos[1] : kit.groundY(pos[0], pos[pos.length - 1]);
+   *  pos: [x, z] (height from the ground) or [x, y, z] (exact road height, needed on slopes and decks).
+   *  fit: true bends a round patch to the roads that meet there (junctions on a grade): every vertex takes the
+   *  height of the road surfaces nearest to it, weighted towards the closest carriageway. */
+  function junction({ pos, radius = 12, surface = 'asphalt', shape = 'round', fit = false }) {
+    let y = pos.length === 3 ? pos[1] : kit.groundY(pos[0], pos[pos.length - 1]);
     const x = pos[0], z = pos[pos.length - 1];
-    const g = shape === 'square' ? new THREE.PlaneGeometry(radius * 2, radius * 2) : new THREE.CircleGeometry(radius, 32);
-    g.rotateX(-Math.PI / 2);
-    g.translate(x, y + 0.035, z);
-    const mat = surface === 'concrete' ? mats.concrete() : mats.asphalt();
+    let g;
+    if (fit) {
+      const near = roads.filter((o) => { const p = o.route.project(x, z); return p.dist < radius + p.half + 24; });
+      const fitY = (px, pz) => {
+        let sw = 0, sy = 0;
+        for (const o of near) {
+          const p = o.route.project(px, pz);
+          const lat = Math.max(0, Math.abs(p.lateral) - p.half * 0.6), w = 1 / (lat + 0.4) ** 3;
+          sw += w; sy += w * o.route.pointAt(p.s).y;
+        }
+        return sw ? sy / sw : y;
+      };
+      if (near.length) y = fitY(x, z);
+      // the ground under and round the patch follows it, so its rim never floats over a falling verge
+      kit.terrainRef?.shape(x, z, radius + 1, fitY, 6);
+      const rings = Math.max(3, Math.round(radius / 2.5)), segs = 32, P = [x, fitY(x, z) + 0.035, z], idx = [];
+      for (let k = 1; k <= rings + 1; k++) for (let s = 0; s < segs; s++) {
+        // the last ring is a bevel just outside the rim, sloping down into the shaped ground
+        const a = (s / segs) * Math.PI * 2, rr = k > rings ? radius + 0.9 : (radius * k) / rings, px = x + Math.cos(a) * rr, pz = z - Math.sin(a) * rr;
+        P.push(px, fitY(px, pz) + (k > rings ? -0.32 : 0.035), pz);
+      }
+      const at = (k, s) => (k === 0 ? 0 : 1 + (k - 1) * segs + (s % segs));
+      for (let k = 0; k <= rings; k++) for (let s = 0; s < segs; s++) {
+        if (k === 0) idx.push(0, at(1, s), at(1, s + 1));
+        else idx.push(at(k, s), at(k + 1, s), at(k + 1, s + 1), at(k, s), at(k + 1, s + 1), at(k, s + 1));
+      }
+      g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(P.flatMap((v, i) => (i % 3 === 0 ? [(v - x) / (radius * 2) + 0.5] : i % 3 === 2 ? [(v - z) / (radius * 2) + 0.5] : [])), 2));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+    } else {
+      g = shape === 'square' ? new THREE.PlaneGeometry(radius * 2, radius * 2) : new THREE.CircleGeometry(radius, 32);
+      g.rotateX(-Math.PI / 2);
+      g.translate(x, y + 0.035, z);
+    }
+    const mat = surface === 'concrete' ? mats.concrete() : surface === 'gravel' || surface === 'dirt' ? kit.M.textured('dirt', { repeat: 1 }) : mats.asphalt();
     kit.addStatic(g, mat, { cast: false, receive: true });
     kit.collision.triangles(g, surface);
     junctions.push({ x, y, z, r: radius });

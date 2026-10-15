@@ -58,16 +58,52 @@ export function makeTerrain(kit, spec) {
         const i0 = Math.max(0, Math.floor((rx - outer - x0) / cell)), i1 = Math.min(nx - 1, Math.ceil((rx + outer - x0) / cell));
         const j0 = Math.max(0, Math.floor((rz - outer - z0) / cell)), j1 = Math.min(nz - 1, Math.ceil((rz + outer - z0) / cell));
         const tx = route.tx[k], tz = route.tz[k];
+        // local grade, so a vertex gets the road height where it projects onto the road, not this sample's
+        const ka = route.idx(k - 1), kb = route.idx(k + 1);
+        let ds = route.dist[kb] - route.dist[ka]; if (ds <= 0) ds += route.length;
+        const grade = ds > 0.01 ? (route.y[kb] - route.y[ka]) / ds : 0;
         for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
           const dx = x0 + i * cell - rx, dz = z0 + j * cell - rz;
-          const along = Math.abs(dx * tx + dz * tz);
+          const alongS = dx * tx + dz * tz, along = Math.abs(alongS);
           if (along > 2.5 + cell) continue; // only the slab around this sample
           const lat = Math.abs(dx * tz - dz * tx);
           const w = 1 - smoothstep(inner, outer, lat);
           const idx = j * nx + i;
           if (w <= 0) continue;
-          if (w > carvedW[idx]) { heights[idx] = raw[idx] + (ry - raw[idx]) * w; carvedW[idx] = w; }
+          // the strongest weight wins; where two roads both carve at full strength (junctions, roads leaving
+          // each other) the lower one wins, so a road dropping away from another is never buried by it
+          const h = raw[idx] + (ry + alongS * grade - raw[idx]) * w;
+          if (w > carvedW[idx] + 1e-4 || (w > carvedW[idx] - 1e-4 && h < heights[idx])) { heights[idx] = h; carvedW[idx] = w; }
         }
+      }
+    },
+    /** Flatten a pad (car parks, quays, plazas): inside polygon [[x, z], ...] -> y - 0.12, blend over `blend`
+     *  metres outside. Like carve(), the strongest weight wins where pads and roads overlap. */
+    flatten(poly, y, blend = 8) {
+      let bx0 = Infinity, bx1 = -Infinity, bz0 = Infinity, bz1 = -Infinity;
+      for (const [px, pz] of poly) { bx0 = Math.min(bx0, px); bx1 = Math.max(bx1, px); bz0 = Math.min(bz0, pz); bz1 = Math.max(bz1, pz); }
+      const i0 = Math.max(0, Math.floor((bx0 - blend - x0) / cell)), i1 = Math.min(nx - 1, Math.ceil((bx1 + blend - x0) / cell));
+      const j0 = Math.max(0, Math.floor((bz0 - blend - z0) / cell)), j1 = Math.min(nz - 1, Math.ceil((bz1 + blend - z0) / cell));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const px = x0 + i * cell, pz = z0 + j * cell;
+        const d = polyDistance(poly, px, pz);
+        const w = d <= 0 ? 1 : 1 - smoothstep(0, blend, d);
+        const idx = j * nx + i;
+        if (w > 0 && w >= carvedW[idx]) { heights[idx] = raw[idx] + (y - 0.12 - raw[idx]) * w; carvedW[idx] = w; }
+      }
+    },
+    /** Shape the ground round (cx, cz) to fn(x, z) - 0.25 inside `radius` (a junction patch bent over a grade),
+     *  blending into the ground as it is over `blend` metres. */
+    shape(cx, cz, radius, fn, blend = 6) {
+      const R = radius + blend;
+      const i0 = Math.max(0, Math.floor((cx - R - x0) / cell)), i1 = Math.min(nx - 1, Math.ceil((cx + R - x0) / cell));
+      const j0 = Math.max(0, Math.floor((cz - R - z0) / cell)), j1 = Math.min(nz - 1, Math.ceil((cz + R - z0) / cell));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const px = x0 + i * cell, pz = z0 + j * cell, d = Math.hypot(px - cx, pz - cz);
+        if (d > R) continue;
+        const w = d <= radius ? 1 : 1 - smoothstep(radius, R, d), idx = j * nx + i;
+        heights[idx] += (fn(px, pz) - 0.25 - heights[idx]) * w;
+        carvedW[idx] = Math.max(carvedW[idx], w);
       }
     },
     /** Build render chunks + physics heightfield. */
@@ -124,8 +160,14 @@ export function makeTerrain(kit, spec) {
         }
         return err;
       };
+      // blocks next to roads and pads start from full resolution on every preset (a coarse grid would bury the
+      // carved road bed); they still coarsen where the carved ground is flat enough
+      const carvedBlock = (bi, bj) => {
+        for (let j = bj * B; j <= Math.min(nz - 1, bj * B + B); j++) for (let i = bi * B; i <= Math.min(nx - 1, bi * B + B); i++) if (carvedW[j * nx + i] > 0) return true;
+        return false;
+      };
       for (let bj = 0; bj < blocksZ; bj++) for (let bi = 0; bi < blocksX; bi++) {
-        let s = minStep;
+        let s = carvedBlock(bi, bj) ? 1 : minStep;
         for (const cand of [8, 4, 2]) if (cand > s && coarseErr(bi, bj, cand) <= tol) { s = cand; break; }
         stepOf[bj * blocksX + bi] = s;
       }
@@ -197,3 +239,15 @@ function proceduralHeight({ base = 0, amplitude = 40, scale = 0.0025, ridged: ri
   };
 }
 export { clamp };
+
+/** Signed distance from (x, z) to a simple polygon [[x, z], ...] (negative inside). */
+export function polyDistance(poly, x, z) {
+  let d = Infinity, inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [ax, az] = poly[j], [bx, bz] = poly[i];
+    if ((bz > z) !== (az > z) && x < ((ax - bx) * (z - bz)) / (az - bz) + bx) inside = !inside;
+    const ex = bx - ax, ez = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / (ex * ex + ez * ez || 1)));
+    d = Math.min(d, Math.hypot(x - ax - ex * t, z - az - ez * t));
+  }
+  return inside ? -d : d;
+}

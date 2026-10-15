@@ -1,6 +1,6 @@
 // FORMOSA: northern Taiwan squeezed into 5 x 5 km. Work in progress.
 import { heightAt, BOUNDS, terrainColor, terrainSurface } from './terrain.js';
-import { TOUGE, RING, QIXING_LOOP, JIUFEN, RALLY, GUANDU, YEHLIU, RIVERSIDE } from './routes.js';
+import { TOUGE, RING, QIXING_LOOP, JIUFEN, RALLY, GUANDU, YEHLIU, RIVERSIDE, FARM_LINK, JUNCTIONS, HARBOUR_RAMP } from './routes.js';
 import { avenueRoads, cityJunctions, CIRCUIT, ELEVATED } from './city-plan.js';
 import { build } from './build/index.js';
 
@@ -18,19 +18,35 @@ export default {
   terrain: { size: [BOUNDS.x1 - BOUNDS.x0, BOUNDS.z1 - BOUNDS.z0], center: [(BOUNDS.x0 + BOUNDS.x1) / 2, (BOUNDS.z0 + BOUNDS.z1) / 2], cell: 4, surface: 'grass', height: heightAt, lodTolerance: 0.35, material: 'ground', colorFn: terrainColor, surfaceFn: terrainSurface },
   water: { level: 0, size: 14000, center: [0, 0], color: 0x0b2630 },
   roads: [
-    { id: 'formosa-ring', name: 'Formosa Ring', closed: true, width: 12, lanes: 2, markings: 'double-yellow', points: RING.pts, smoothPasses: 4, tunnels: RING.tunnels },
-    { id: 'yangming-road', name: 'Yangming Road', width: 10, lanes: 2, markings: 'double-yellow', points: TOUGE, smoothPasses: 3 },
+    { id: 'formosa-ring', name: 'Formosa Ring', closed: true, width: 12, lanes: 2, markings: 'double-yellow', points: RING.pts, smoothPasses: 4, tunnels: RING.tunnels,
+      shoulder: { width: 1.6, surface: 'concrete' },
+      lights: [
+        { from: 0, to: 1180, spacing: 36, side: 'both', height: 10, intensity: 140, range: 38, color: 0xfff0d8 },   // the levee expressway
+        { from: 3000, to: 3360, spacing: 30, side: 'alternate', height: 8.5, intensity: 110, range: 30 },           // Tamsui
+        { from: 5440, to: 5760, spacing: 30, side: 'alternate', height: 8.5, intensity: 110, range: 30 },           // Jinshan
+        { from: 6420, to: 6960, spacing: 30, side: 'alternate', height: 8.5, intensity: 110, range: 30 },           // the harbour
+        { from: 9950, to: 10560, spacing: 30, side: 'alternate', height: 8.5, intensity: 110, range: 30 },          // Wujie village
+        { from: 12080, to: 15170, spacing: 32, side: 'both', height: 9, intensity: 120, range: 32, color: 0xffd9a8 }, // Xinyi and Heping Road
+      ] },
+    { id: 'yangming-road', name: 'Yangming Road', width: 10, lanes: 2, markings: 'double-yellow', points: TOUGE, smoothPasses: 3,
+      lights: [{ from: 0, to: 320, spacing: 34, side: 'alternate', height: 8.5, intensity: 110, range: 30 }] },
     { id: 'jiufen-road', name: 'Jiufen Road', width: 9, lanes: 2, markings: 'double-yellow', points: JIUFEN, smoothPasses: 3 },
     { id: 'taipei-circuit', name: 'Taipei Night Circuit', closed: true, width: 16, lanes: 4, markings: 'double-yellow', points: CIRCUIT, smoothY: false, shoulder: { width: 3.2, surface: 'concrete' }, lights: { spacing: 30, side: 'both', height: 9, intensity: 120, range: 32, color: 0xffd9a8 } },
-    { id: 'civic-elevated', name: 'Civic Elevated', width: 15, lanes: 4, markings: 'double-yellow', points: ELEVATED, smoothY: false, bridge: true },
+    { id: 'civic-elevated', name: 'Civic Elevated', width: 15, lanes: 4, markings: 'double-yellow', points: ELEVATED, smoothY: false, bridge: true,
+      shoulder: { width: 1, surface: 'concrete' }, walls: { left: 'barrier', right: 'barrier' }, wallOffset: 0.2,
+      lights: { spacing: 42, side: 'alternate', height: 9, intensity: 150, range: 38, color: 0xfff0d8 } },
     ...avenueRoads().map((a) => ({ id: a.id, name: a.name, width: a.w, lanes: a.w >= 16 ? 4 : 2, markings: 'double-yellow', points: a.points, smoothY: false, step: 4, shoulder: { width: 3.2, surface: 'concrete' }, lights: { spacing: 32, side: 'alternate', height: 9, intensity: 110, range: 30, color: 0xffd9a8 } })),
     { id: 'paddy-rally', name: 'Paddy Rally Loop', closed: true, width: 8, lanes: 2, markings: 'none', surface: 'gravel', shoulder: { width: 1, surface: 'grass' }, points: RALLY, smoothPasses: 2 },
-    { id: 'guandu-bridge', name: 'Guandu Bridge', width: 11, lanes: 2, markings: 'double-yellow', points: GUANDU, smoothPasses: 2, bridge: true },
+    { id: 'guandu-bridge', name: 'Guandu Bridge', width: 11, lanes: 2, markings: 'double-yellow', points: GUANDU, smoothPasses: 2, bridge: [{ from: 40, to: 520 }],
+      walls: [{ from: 40, to: 520, left: 'barrier', right: 'barrier' }], wallOffset: 0.3, lights: [{ from: 40, to: 520, spacing: 40, side: 'both', height: 8, intensity: 120, range: 32 }] },
     { id: 'yehliu-road', name: 'Yehliu Geopark Road', width: 8, lanes: 2, markings: 'center-dashed', points: YEHLIU, smoothPasses: 3 },
     { id: 'riverside-park', name: 'Riverside Park Road', width: 10, lanes: 2, markings: 'center-dashed', points: RIVERSIDE, smoothPasses: 3 },
+    { id: 'harbour-ramp', name: 'Harbour Ramp', width: 8, lanes: 2, markings: 'none', surface: 'concrete', points: HARBOUR_RAMP, smoothY: false, step: 3,
+      walls: { left: 'barrier', right: 'barrier' }, wallOffset: 0.3 },
+    { id: 'dongshan-farm-road', name: 'Dongshan Farm Road', width: 6.5, lanes: 1, markings: 'none', surface: 'concrete', shoulder: { width: 0.8, surface: 'grass' }, points: FARM_LINK, smoothPasses: 2 },
     { id: 'qixing-loop', name: 'Seven Star Loop', closed: true, width: 11, lanes: 2, markings: 'center-dashed', points: QIXING_LOOP, smoothPasses: 3 },
   ],
-  junctions: [...cityJunctions()],
+  junctions: [...cityJunctions(), ...JUNCTIONS],
   events: [
     { id: 'formosa-ring', type: 'circuit', name: 'Formosa Ring', nameZh: '福爾摩沙環線', route: 'formosa-ring', laps: 1, ai: 7, time: 17.55,
       rewards: { credits: [260000, 150000, 90000] }, description: 'One lap of the whole north: the river levee, Tamsui, four tunnels and the cliff ledge on the north coast, the Bitou pass, the paddy valley, Elephant Mountain and Heping Road. Fifteen kilometres at sunset.' },
