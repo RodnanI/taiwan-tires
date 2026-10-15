@@ -212,12 +212,12 @@ export function makeProps(kit) {
       const table = new THREE.BoxGeometry(2.4, 0.9, 1.2); table.translate(0, 0.45, 0);
       const poles = []; for (const [x, z] of [[1.15, 0.55], [-1.15, 0.55], [1.15, -0.55], [-1.15, -0.55]]) { const p = new THREE.BoxGeometry(0.05, 2.3, 0.05); p.translate(x, 1.15, z); poles.push(p); }
       const awn = new THREE.PlaneGeometry(2.8, 1.8); awn.rotateX(-Math.PI / 2 + 0.18); awn.translate(0, 2.35, 0.1);
-      return [P(kit.merge([table, ...poles]), mat.pole()), P(awn, mat.awning(), false)];
+      return [{ ...P(kit.merge([table, ...poles]), mat.pole()), tint: false }, P(awn, mat.awning(), false)];
     },
     umbrella: () => {
       const pole = new THREE.CylinderGeometry(0.03, 0.03, 2.3, 4); pole.translate(0, 1.15, 0);
       const top = new THREE.ConeGeometry(1.3, 0.45, 8, 1, true); top.translate(0, 2.35, 0);
-      return [P(pole, mat.pole(), false), P(top, mat.awning(), false)];
+      return [{ ...P(pole, mat.pole(), false), tint: false }, P(top, mat.awning(), false)];
     },
     powerPole: () => { const g = new THREE.CylinderGeometry(0.14, 0.2, 10, 8); g.translate(0, 5, 0); const c = new THREE.BoxGeometry(2.2, 0.12, 0.12); c.translate(0, 9.3, 0); return [P(kit.merge([g, c]), M.shared('wood', () => M.surface({ color: 0x6b5b4a, roughness: 0.95 })))]; },
   };

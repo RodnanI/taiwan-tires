@@ -137,7 +137,7 @@ function buildCore(kit, ctx, F, r, shared) {
   }
 }
 
-export const treeTint = (r) => [0x9fc38a, 0x8fb878, 0xb2cf92, 0x86ac70][Math.floor(r() * 4)];
+export const treeTint = (r) => [0x6aa552, 0x5f9a48, 0x78b05c, 0x56913f][Math.floor(r() * 4)];
 
 /** Freestanding slab building (windows on all four faces) on the atlas. */
 export function slab(B, kit, x, z, w, d, floors, r, upper = 'apt', roof = null, tintOverride = null, rot = 0, y = CITY_Y) {

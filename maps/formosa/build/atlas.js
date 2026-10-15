@@ -25,6 +25,8 @@ export const TILE = {
   shopC: [0, 5], tea: [1, 5], scooterShop: [2, 5], pharmacy: [3, 5], closedB: [4, 5], gate: [5, 5], market: [6, 5], blank: [7, 5],
   // roofs and sheds
   roof: [0, 6], roofB: [1, 6], sheet: [2, 6], sheetB: [3, 6], gravel: [4, 6], solar: [5, 6], tileRoof: [6, 6], plain: [7, 6],
+  // temples and screens: glazed tiles (tinted gold or green), a studded door, two lit advertising screens, stone paving
+  glazed: [0, 7], door: [1, 7], screen: [2, 7], screenB: [3, 7], paving: [4, 7],
 };
 export const LIT = { grille: 'grilleLit', ac: 'acLit', balcony: 'balconyLit', twin: 'twinLit', enclosed: 'enclosedLit', apt: 'aptLit', laundry: 'laundryLit', band: 'bandLit', grid: 'gridLit', curtain: 'curtainLit', fins: 'finsLit', hotel: 'hotelLit', shutters: 'shuttersLit', arch: 'archLit' };
 
@@ -186,6 +188,33 @@ export function makeFacadeAtlas(M, nightList) {
     else if (kind === 'plain') { rect(g, x, y, T, T, '#dedad1'); }
   };
   for (const k of ['roof', 'roofB', 'sheet', 'sheetB', 'gravel', 'solar', 'tileRoof', 'plain']) roofT(k, k);
+
+  // ---- row 7: glazed roof tiles, temple door, screens, paving
+  {
+    let [x, y] = at('glazed');
+    rect(g, x, y, T, T, '#f1ead8');
+    for (let k = 0; k < 16; k++) { rect(g, x, y + k * 8 + 5, T, 3, 'rgba(90,70,30,0.32)'); }
+    for (let k = 0; k < 16; k++) for (let q = 0; q < 16; q++) if ((k + q) % 2 === 0) rect(g, x + q * 8, y + k * 8, 1, 5, 'rgba(90,70,30,0.18)');
+    [x, y] = at('door');
+    rect(g, x, y, T, T, '#efe6d6');
+    g.strokeStyle = 'rgba(70,30,20,0.55)'; g.lineWidth = 3; g.strokeRect(x + 8, y + 8, T / 2 - 12, T - 16); g.strokeRect(x + T / 2 + 4, y + 8, T / 2 - 12, T - 16);
+    for (let k = 0; k < 6; k++) for (let q = 0; q < 3; q++) for (const ox of [16, T / 2 + 12]) { g.fillStyle = '#f6d47a'; g.beginPath(); g.arc(x + ox + q * 14, y + 20 + k * 17, 3, 0, Math.PI * 2); g.fill(); }
+    const screen = (name, seed) => {
+      const [sx, sy] = at(name);
+      const pal = seed ? ['#ff3e8a', '#2ad1ff', '#ffe14d', '#ffffff'] : ['#ff7a1a', '#36ff8a', '#3a7aff', '#ffffff'];
+      for (const G of [g, ge]) {
+        G.fillStyle = '#05060a'; G.fillRect(sx, sy, T, T);
+        for (let k = 0; k < 7; k++) { G.fillStyle = pal[k % pal.length]; const w = 12 + r() * 50, h = 8 + r() * 30; G.globalAlpha = 0.85; G.fillRect(sx + 6 + r() * (T - w - 12), sy + 6 + r() * (T - h - 12), w, h); }
+        G.globalAlpha = 1;
+        G.fillStyle = pal[3]; G.font = `bold 34px ${FONT_CJK}`; G.textAlign = 'center'; G.textBaseline = 'middle';
+        G.fillText(seed ? '新上市' : '大特價', sx + T / 2, sy + T / 2);
+      }
+    };
+    screen('screen', 0); screen('screenB', 1);
+    [x, y] = at('paving');
+    rect(g, x, y, T, T, '#d9d4c8');
+    for (let k = 0; k < 4; k++) for (let q = 0; q < 4; q++) { g.strokeStyle = 'rgba(80,70,60,0.25)'; g.lineWidth = 2; g.strokeRect(x + q * 32 + (k % 2) * 16, y + k * 32, 32, 32); }
+  }
 
   // pad: copy each tile's edge pixels outward is costly on a stub canvas; tiles already fill their cell fully
   const map = canvasTexture(c, { repeat: false }), emi = canvasTexture(e, { repeat: false });

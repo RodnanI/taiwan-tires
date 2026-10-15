@@ -289,7 +289,8 @@ export function naturalAt(x, z) { ensureGrid(); return bicubic(G.nat, x, z); }
 const C = (hex) => { const c = { r: 0, g: 0, b: 0 }; const v = [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255].map((k) => { const s = k / 255; return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; }); c.r = v[0]; c.g = v[1]; c.b = v[2]; return c; };
 const PAL = {
   forest: C(0x35532a), forest2: C(0x456637), grass: C(0x5d7b39), meadow: C(0x8e9156), straw: C(0xa59c66),
-  rock: C(0x6c6457), cliff: C(0x857865), sand: C(0xcdbb90), wetSand: C(0x9a8b6a), seabed: C(0x56543f),
+  rock: C(0x5a5f4e), cliff: C(0x8a8170), sand: C(0xcdbb90), wetSand: C(0x9a8b6a), seabed: C(0x56543f),
+  jungle: C(0x2f4a25), sandstone: C(0xc4a877),
   city: C(0x5c5a56), park: C(0x5b8a3a), field: C(0x6a8c34), mud: C(0x6b5a42),
 };
 const mixC = (a, b, t, o) => { o.r = a.r + (b.r - a.r) * t; o.g = a.g + (b.g - a.g) * t; o.b = a.b + (b.b - a.b) * t; return o; };
@@ -321,9 +322,13 @@ export function terrainColor(x, z, h, slope, out) {
     if (R.valley > 0) mixC(_a, PAL.field, R.valley * 0.85, _a);
     c = _a;
   }
-  // bare rock on steep cuts and sea cliffs
-  const rockT = sst(0.95, 1.5, slope);
+  // steep slopes stay green under the jungle; only the steepest cuts and the sea cliffs show bare rock
+  if (slope > 0.55) c = mixC(c, PAL.jungle, sst(0.55, 1.1, slope) * 0.8, _a);
+  const rockT = sst(1.15, 1.9, slope) * (0.75 + 0.25 * n2);
   if (rockT > 0) c = mixC(c, R.inland < 260 ? PAL.cliff : PAL.rock, rockT, _a);
+  // Yehliu: the bare sandstone cape
+  const yl = Math.hypot((x - 10) / 70, (z + 2235) / 75);
+  if (yl < 1.2 && h > -1) c = mixC(c, PAL.sandstone, (1 - sst(0.75, 1.2, yl)) * sst(-1, 0.5, h), _a);
   if (R.city > 0) c = mixC(c, PAL.city, R.city, _a);
   const k = (0.84 + n2 * 0.32) * 1.12;
   out.r = c.r * k; out.g = c.g * k; out.b = c.b * k;

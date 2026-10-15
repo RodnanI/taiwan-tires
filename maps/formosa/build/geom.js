@@ -12,9 +12,13 @@ export class Builder {
   /** Quad p0 p1 p2 p3 (counter-clockwise seen from the front), uv rect [u0, v0, u1, v1], colour [r, g, b]. */
   quad(p0, p1, p2, p3, uv, c = WHITE) {
     const v = this.pos.length / 3;
-    const ux = p1[0] - p0[0], uy = p1[1] - p0[1], uz = p1[2] - p0[2], wx = p3[0] - p0[0], wy = p3[1] - p0[1], wz = p3[2] - p0[2];
+    // normal from the diagonals: also right for triangles passed as quads with two corners equal (a zero
+    // normal there turns into NaN in the shader and blacks out the whole frame through bloom)
+    const ux = p2[0] - p0[0], uy = p2[1] - p0[1], uz = p2[2] - p0[2], wx = p3[0] - p1[0], wy = p3[1] - p1[1], wz = p3[2] - p1[2];
     let nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
-    const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+    const l = Math.hypot(nx, ny, nz);
+    if (l < 1e-9) return;
+    nx /= l; ny /= l; nz /= l;
     for (const p of [p0, p1, p2, p3]) { this.pos.push(p[0], p[1], p[2]); this.nor.push(nx, ny, nz); this.col.push(c[0], c[1], c[2]); }
     this.uv.push(uv[0], uv[1], uv[2], uv[1], uv[2], uv[3], uv[0], uv[3]);
     this.idx.push(v, v + 1, v + 2, v, v + 2, v + 3);

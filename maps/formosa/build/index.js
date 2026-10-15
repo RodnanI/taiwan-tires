@@ -7,6 +7,8 @@ import { furnish } from './roadside.js';
 import { buildCoast } from './coast.js';
 import { buildRiver } from './river.js';
 import { buildTowns } from './towns.js';
+import { buildLandmarks } from './landmarks.js';
+import { buildStreetLife } from './streetlife.js';
 import { CITY_Y } from '../geo.js';
 import { ROUNDABOUT } from '../city-plan.js';
 
@@ -31,10 +33,14 @@ export async function build(ctx) {
   shared.mask = mask;
   buildCity(kit, r, shared);
   await tick();
+  buildLandmarks(kit, shared, r);
+  await tick();
   buildCoast(kit, shared, r);
   buildRiver(kit, shared, r);
   await tick();
   buildTowns(shared);
+  await tick();
+  buildStreetLife(kit, shared, r);
   await tick();
   mask.markStatics(kit);
   // roadside furniture from the carved terrain (before the kit decorates roads in finalize)

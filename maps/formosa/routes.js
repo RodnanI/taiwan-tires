@@ -152,10 +152,10 @@ export const RIVERSIDE = (() => {
 const LINK_RING = nearestOn(RING.pts, 1765, 900);
 export const FARM_LINK = [[1649, 900], [1700, 901], [LINK_RING[0], LINK_RING[2]]];
 
-// Fishing harbour: the quay apron sits under the ring at 5 m; a ramp drops to it from the east.
-export const HARBOUR = { x0: 1395, x1: 1712, zq: -1893, y: 5.0, rampZ: -1849 };
-const RAMP_FROM = nearestOn(RING.pts, 1765, -1814);
-export const HARBOUR_RAMP = [[RAMP_FROM[0], RAMP_FROM[1], RAMP_FROM[2]], [1746, 7.9, -1830], [1726, 6.0, -1843], [HARBOUR.x1, HARBOUR.y + 0.01, HARBOUR.rampZ]];
+// Fishing harbour: the quay apron sits 3.6 m above the water, under the ring; a ramp drops to it from the east.
+export const HARBOUR = { x0: 1395, x1: 1712, zq: -1893, y: 3.6, rampZ: -1849 };
+const RAMP_FROM = nearestOn(RING.pts, 1800, -1824);
+export const HARBOUR_RAMP = [[RAMP_FROM[0], RAMP_FROM[1], RAMP_FROM[2]], [1784, 9.6, -1834], [1762, 7.8, -1842], [1740, 5.7, -1847], [1724, 4.3, -1849], [HARBOUR.x1, HARBOUR.y + 0.01, HARBOUR.rampZ]];
 
 /** Junction patches outside the city grid: bent to the roads on a grade. */
 export const JUNCTIONS = [

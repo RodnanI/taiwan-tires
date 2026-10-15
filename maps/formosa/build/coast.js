@@ -3,8 +3,9 @@
 // lighthouses with sweeping beams, the Shimen wind farm and the Yehliu hoodoo field.
 import * as THREE from 'three';
 import { tileUV } from './atlas.js';
-import { lin, mulC } from './geom.js';
+import { Builder, lin, mulC } from './geom.js';
 import { slab } from './city.js';
+import { templeHall, incenseBurner } from './temple.js';
 import { coastZ } from '../geo.js';
 import { HARBOUR } from '../routes.js';
 
@@ -40,7 +41,8 @@ function defineProps(kit) {
     const mast = new THREE.CylinderGeometry(0.09, 0.12, 8, 6); mast.translate(0, 5, 1.2);
     const boom = new THREE.BoxGeometry(0.12, 0.12, 12); boom.translate(0, 5.2, -1.8);
     const lamps = [];
-    for (let k = 0; k < 7; k++) for (const sx of [-1.6, 1.6]) { const g = new THREE.SphereGeometry(0.28, 6, 4); g.translate(sx, 4.4, -7 + k * 1.7); lamps.push(g); }
+    for (let k = 0; k < 7; k++) for (const sx of [-1.6, 1.6]) { const g = new THREE.SphereGeometry(0.17, 6, 4); g.translate(sx, 4.4, -7 + k * 1.7); lamps.push(g); }
+    for (const sx of [-1.6, 1.6]) { const w = new THREE.BoxGeometry(0.03, 0.03, 11); w.translate(sx, 4.62, -1.9); lamps.push(w); }
     props.define('squidBoat', [P(hull, white), P(kit.merge([deck, roof]), dark, { tint: false }), P(cabin, white, { tint: false }), P(kit.merge([mast, boom]), dark, { tint: false, castShadow: false }), P(kit.merge(lamps), bulbs, { tint: false, castShadow: false })], { maxDistance: 1400 });
   }
   // tetrapod: four legs from the centre towards the corners of a tetrahedron
@@ -102,6 +104,15 @@ function harbour(kit, shared, r) {
     kit.collision.cylinder({ x, z: zq + 0.9, r: 0.3, y0: y - 1, y1: y + 0.7, kind: 'bollard' });
     kit.props.place('fender', [x + 5, y - 1.6, zq - 0.25], 0);
   }
+  // paint: a yellow line along the quay edge, parking bays along the east wall, a box at the ramp foot
+  const paint = new Builder(kit, kit.roadMats.mark(), { cast: false });
+  const rect = (ax, az, bx, bz, c) => paint.quad([ax, y + 0.045, bz], [bx, y + 0.045, bz], [bx, y + 0.045, az], [ax, y + 0.045, az], tileUV('plain'), c);
+  const yellow = lin(0xe8b828), white = [0.92, 0.92, 0.9];
+  rect(x0 + 2, zq + 1.4, x1 - 2, zq + 1.6, yellow);
+  for (let x = 1632; x < x1 - 14; x += 2.6) rect(x, ringZ(x) - 19, x + 0.12, ringZ(x) - 14, white);
+  for (const [ax, az, bx, bz] of [[x1 - 16, HARBOUR.rampZ - 6, x1 - 1, HARBOUR.rampZ - 5.8], [x1 - 16, HARBOUR.rampZ + 5.8, x1 - 1, HARBOUR.rampZ + 6], [x1 - 16, HARBOUR.rampZ - 6, x1 - 15.8, HARBOUR.rampZ + 6]]) rect(ax, az, bx, bz, yellow);
+  paint.flush();
+  for (let x = 1634; x < x1 - 16; x += 2.6) if (r() < 0.45) kit.props.place('parkedCar', [x + 1.3, y, ringZ(x) - 16.5], r() < 0.5 ? 0 : Math.PI, 1, pick(r, [0xe8e8e4, 0x1c1d1f, 0x9aa1a6, 0xb02a24, 0x2c4f7e, 0xd8d2c4]));
   for (let x = x0 + 25; x < x1 - 10; x += 46) kit.props.streetLamp([x, y, zq + 3], 0, { height: 10, arm: 1.6, intensity: 130, range: 36, color: 0xfff1d6 });
   kit.collision.wall(x0, zq + 0.2, x1, zq + 0.2, { y0: y - 1, y1: y + 0.35, kind: 'kerb' });
   // breakwaters: concrete arms out to the entrance, tetrapods piled along the seaward face
@@ -126,12 +137,30 @@ function harbour(kit, shared, r) {
   for (const [x, z, col] of [[1468, -2006, 0x2fd06a], [1640, -2006, 0xff3a2a]]) beacon(kit, x, z, 3.2, col);
   // squid boats along the quay (some rafted two deep) and a few at anchor
   const hulls = [0xf4f2ec, 0x3a7bb5, 0xdfe5e6, 0x2e6e8c, 0xc8473a, 0x4c9a88, 0xf4f2ec, 0xe0b640];
-  for (let x = x0 + 14; x < x1 - 10; x += 18 + r() * 4) {
-    kit.props.place('squidBoat', [x, 0, zq - 3.2], r() < 0.5 ? Math.PI / 2 : -Math.PI / 2, 1, pick(r, hulls));
-    if (r() < 0.45) kit.props.place('squidBoat', [x + (r() - 0.5) * 3, 0, zq - 8.2], r() < 0.5 ? Math.PI / 2 : -Math.PI / 2, 0.92, pick(r, hulls));
+  for (let x = x0 + 16; x < x1 - 12; x += 21 + r() * 4) {
+    kit.props.place('squidBoat', [x, 0, zq - 3.7], r() < 0.5 ? Math.PI / 2 : -Math.PI / 2, 1.25, pick(r, hulls));
+    if (r() < 0.55) kit.props.place('squidBoat', [x + (r() - 0.5) * 3, 0, zq - 9.6], r() < 0.5 ? Math.PI / 2 : -Math.PI / 2, 1.15, pick(r, hulls));
   }
-  for (let z = zq - 14; z > -1964; z -= 17) kit.props.place('squidBoat', [x0 + 7.8, 0, z], r() < 0.5 ? 0 : Math.PI, 0.95, pick(r, hulls));
-  for (let k = 0; k < 4; k++) kit.props.place('squidBoat', [1500 + r() * 110, 0, -1935 - r() * 40], r() * 6, 1, pick(r, hulls));
+  for (let z = zq - 16; z > -1962; z -= 20) kit.props.place('squidBoat', [x0 + 8.6, 0, z], r() < 0.5 ? 0 : Math.PI, 1.15, pick(r, hulls));
+  for (let z = zq - 18; z > -1960; z -= 22) kit.props.place('squidBoat', [x1 - 8.6, 0, z], r() < 0.5 ? 0 : Math.PI, 1.15, pick(r, hulls));
+  for (let k = 0; k < 5; k++) kit.props.place('squidBoat', [1480 + r() * 150, 0, -1925 - r() * 45], r() * 6, 1.2, pick(r, hulls));
+  // Mazu, goddess of the sea, faces the harbour from the west end of the quay
+  const T = templeHall(kit, shared.city.wallB, { x: 1411, z: zq + 13, y, face: Math.PI, w: 18, d: 13, h: 4.8, tiers: 2, roof: 'gold' });
+  incenseBurner(kit, 1411, zq + 3.4, y + 0.02, 0.9);
+  mask.rect(1399, zq, 1424, zq + 22);
+  // seafood stalls along the landward wall, facing the quay
+  const stallC = [0xd84a3a, 0x3a7ad8, 0xe8c24a, 0x4aa86a, 0xf2f0ea];
+  for (let k = 0; k < land.length - 1; k++) {
+    const [ax, az] = land[k], [bx, bz] = land[k + 1];
+    if (ax < 1440 || bx > 1626) continue;
+    for (let s2 = 2; s2 < 15; s2 += 4.6) {
+      const t = s2 / 16, sx = ax + (bx - ax) * t, sz = az + (bz - az) * t - 2.2;
+      if (r() < 0.2) continue;
+      kit.props.place('stall', [sx, y, sz], Math.PI, 1, pick(r, stallC));
+      if (r() < 0.6) kit.props.place('umbrella', [sx + 2.2, y, sz - 3.6], r() * 6, 1, pick(r, stallC));
+    }
+    if (k % 2) kit.props.place('lantern', [ax, y + 3.2, az - 0.6], 0, 1, null, { collide: false });
+  }
   // the fish market: an open hall under a gabled sheet roof, crates and nets underneath
   fishMarket(kit, shared, r, { x0: 1636, x1: 1700, z0: zq + 5, z1: zq + 33, y });
   // ice plant at the west end

@@ -5,8 +5,8 @@ import { fbm, valueNoise } from '../../../src/core/math.js';
 import { CITY, VALLEY, coastZ } from '../geo.js';
 
 const inRect = (x, z, R, pad = 0) => x > R.x0 - pad && x < R.x1 + pad && z > R.z0 - pad && z < R.z1 + pad;
-export const GREENS = [0x8fb878, 0x9fc38a, 0x7fa86a, 0xa9c98d, 0x86ac70, 0x93b27c];
-export const CEDARS = [0x6f8f62, 0x7a9a6a, 0x65855a, 0x80a070];
+export const GREENS = [0x5c9a46, 0x6aa850, 0x4f8c3e, 0x78b058, 0x5a9444, 0x66a04c];
+export const CEDARS = [0x48683c, 0x54744a, 0x3f5f36, 0x5c7c4c];
 const pick = (r, a) => a[Math.floor(r() * a.length)];
 
 export function plantHills(kit, mask, r) {
@@ -23,7 +23,11 @@ export function plantHills(kit, mask, r) {
     const inland = pz - coastZ(px);
     const near = mask.nearRoad(px, pz);
     const s = slopeAt(px, pz);
-    if (s > 1.25) continue;                                    // rock faces
+    if (s > 1.9) continue;                                     // rock faces
+    if (s > 1.2) {                                             // steep banks: scrub clinging on
+      if (r() < 0.5 * veg) kit.props.place(r() < 0.6 ? 'shrub' : 'canopy', [px, y - 0.6, pz], r() * 6, 0.6 + r() * 0.5, pick(r, GREENS));
+      continue;
+    }
     const n = fbm(px * 0.006 + 2.1, pz * 0.006 - 4.7, 3), n2 = valueNoise(px * 0.03, pz * 0.03);
     // plateau meadows: silvergrass along the roads, scattered cedar windbreaks
     if (y > 262) {

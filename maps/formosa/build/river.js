@@ -3,6 +3,7 @@
 // the far bank.
 import * as THREE from 'three';
 import { RIVER_PARK, GUANDU_BRIDGE } from '../routes.js';
+import { treeTint } from './city.js';
 
 const pick = (r, a) => a[Math.floor(r() * a.length)];
 
@@ -59,8 +60,8 @@ function riversidePark(kit, shared, r) {
     const g = new THREE.PlaneGeometry(3, 4.2); g.rotateX(-Math.PI / 2); g.translate(x, kit.groundY(x, z) + 0.05, z); path.push(g);
   }
   if (path.length) kit.addStatic(kit.merge(path), kit.roadMats.concrete(), { cast: false });
-  for (let z = 720; z < 2000; z += 18) { const x = -1915 + r() * 3; if (z > z0 - 4 && z < z1 + 4) continue; kit.props.place('broadleaf', [x, kit.groundY(x, z) - 0.2, z], r() * 6, 0.8 + r() * 0.4, pick(r, [0x9fc38a, 0x8fb878, 0xb2cf92])); }
-  for (let z = z0; z < z1; z += 16) kit.props.place('broadleaf', [x0 - 6, kit.groundY(x0 - 6, z) - 0.2, z], r() * 6, 0.9 + r() * 0.4, pick(r, [0x9fc38a, 0x8fb878, 0xb2cf92]));
+  for (let z = 720; z < 2000; z += 18) { const x = -1915 + r() * 3; if (z > z0 - 4 && z < z1 + 4) continue; kit.props.place('broadleaf', [x, kit.groundY(x, z) - 0.2, z], r() * 6, 0.8 + r() * 0.4, treeTint(r)); }
+  for (let z = z0; z < z1; z += 16) kit.props.place('broadleaf', [x0 - 6, kit.groundY(x0 - 6, z) - 0.2, z], r() * 6, 0.9 + r() * 0.4, treeTint(r));
   mask.rect(-1920, 600, -1900, 2000);
 }
 
