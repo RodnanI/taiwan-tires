@@ -1,13 +1,18 @@
 // Roads from control points. Phase 1 (immediately): surface + shoulders + collision + terrain carving.
-// Phase 2 (kit.finalize): markings, kerbs, walls/guardrails, street lights, bridge pillars - so junctions
-// declared later still cut gaps into markings and walls.
+// Phase 2 (kit.finalize): markings, kerbs, walls/guardrails, street lights, bridge pillars, tunnels - so
+// junctions declared later still cut gaps into markings and walls.
+// Segment specs (`walls`, `lights`, `bridge`) take [{ from, to, ... }] in metres along the road; `tunnels`
+// [{ from, to, name, zh }] skip carving (the hill stays on top) and get a lit shell with portals.
 import * as THREE from 'three';
 import { Route, resamplePath } from '../Route.js';
 import { clamp } from '../../core/math.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
-/** Build a ribbon / swept surface. rows: [{ p: Vector3, n: Vector3 (lateral, left), u: Vector3 (up) }], profile: [[lat, h], ...]. */
+/** Normalize a segment spec: true/object -> whole road, array -> as given, falsy -> none. */
+const segList = (v) => (Array.isArray(v) ? v : v ? [{ from: 0, to: Infinity, ...(typeof v === 'object' ? v : {}) }] : []);
+const segAt = (list, d) => list.find((s) => d >= (s.from ?? 0) && d < (s.to ?? Infinity)) || null;
+
 /** Centre-line Route of a road spec without building meshes. groundY(x, z) fills points given as [x, z].
  *  Shared by kit.road() and menu previews (AI tune lap estimates). */
 export function roadRoute(spec, groundY = () => 0) {
@@ -34,6 +39,7 @@ export function roadRoute(spec, groundY = () => 0) {
   return new Route(samples.map((s) => ({ x: s[0], y: s[1] + (spec.lift ?? 0.02), z: s[2], w: s[3] })), { closed: !!spec.closed, id: spec.id, name: spec.name });
 }
 
+/** Build a ribbon / swept surface. rows: [{ p: Vector3, n: Vector3 (lateral, left), u: Vector3 (up) }], profile: [[lat, h], ...]. */
 export function sweep(rows, profile, { closed = false, vScale = 8, uvAcross = true, colors = null } = {}) {
   const pos = [], uv = [], idx = [], col = [];
   const m = profile.length;
@@ -79,6 +85,9 @@ function faceUp(g) {
   return g;
 }
 
+// marking colours (linear, the material multiplies vertex colours)
+const MARK = { white: new THREE.Color(0xe6e3da), yellow: new THREE.Color(0xe0a72a), red: new THREE.Color(0xb8231c) };
+
 export function makeRoads(kit) {
   const { M } = kit;
   const roads = [];
@@ -86,14 +95,15 @@ export function makeRoads(kit) {
   const mats = {
     asphalt: () => kit.M.textured('asphalt', { repeat: 1, roughness: 0.92 }),
     concrete: () => kit.M.textured('concrete', { repeat: 1, roughness: 0.9 }),
-    white: () => M.shared('mark-white', () => M.surface({ color: 0xe6e3da, roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })),
-    yellow: () => M.shared('mark-yellow', () => M.surface({ color: 0xe0a72a, roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })),
-    red: () => M.shared('mark-red', () => M.surface({ color: 0xb8231c, roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })),
+    mark: () => M.shared('marking', () => M.surface({ color: 0xffffff, vertexColors: true, roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })),
     curb: () => M.shared('curb', () => M.surface({ vertexColors: true, roughness: 0.6 })),
     rail: () => M.shared('guardrail', () => M.surface({ color: 0xb9bcbe, roughness: 0.35, metalness: 0.8, side: THREE.DoubleSide })),
     jersey: () => M.shared('jersey', () => M.surface({ color: 0xbab6ad, roughness: 0.9 })),
     wall: () => kit.M.textured('concrete', { repeat: 1, roughness: 0.95, color: 0xc8c4bb }),
     tire: () => M.shared('tirewall', () => M.surface({ color: 0x151515, roughness: 0.95 })),
+    tunnelTile: () => M.shared('tunnelTile', () => M.surface({ color: 0xd8d4c8, roughness: 0.32, metalness: 0.05, side: THREE.DoubleSide })),
+    tunnelVault: () => M.shared('tunnelVault', () => M.surface({ color: 0x34363a, roughness: 0.92, side: THREE.DoubleSide })),
+    tunnelLamp: () => M.shared('tunnelLamp', () => M.surface({ color: 0x1a1612, emissive: 0xffc27a, emissiveIntensity: 2.6, roughness: 0.4 })),
   };
 
   function rowsFor(route, bankFn) {
@@ -112,8 +122,9 @@ export function makeRoads(kit) {
 
   /**
    * Build a road. spec: { id, points: [[x,z] | [x,y,z] | [x,y,z,w]], closed, width, surface, lanes, markings,
-   *   shoulder: { width, surface }, curbs, walls: 'guardrail'|'barrier'|'wall'|'tires'|{left,right}, wallOffset,
-   *   lights: { spacing, side, color, height, offset }, banking: deg | 'auto', bridge, smoothY, tag }
+   *   shoulder: { width, surface }, curbs, walls: 'guardrail'|'barrier'|'wall'|'tires'|{left,right}|[{from,to,left,right}],
+   *   wallOffset, lights: { spacing, side, color, height, offset } | [{ from, to, ... }], banking: deg | 'auto',
+   *   bridge: true | [{ from, to }], tunnels: [{ from, to, name, zh }], smoothY, tag }
    */
   function road(spec) {
     const width = spec.width ?? 10;
@@ -122,6 +133,7 @@ export function makeRoads(kit) {
     const bankFn = bankDeg === 'auto' ? (i) => clamp(route.curv[i] * 160, -7, 7) * Math.PI / 180 : bankDeg ? () => bankDeg * Math.PI / 180 : null;
     const rows = rowsFor(route, bankFn);
     const half = (i) => route.half[i];
+    const bridges = segList(spec.bridge), tunnels = spec.tunnels || [];
     // ---- surface
     const surfKey = spec.surface || 'asphalt';
     const surfGeo = faceUp(sweepVar(rows, (i) => [[half(i), 0], [half(i) * 0.5, 0.012], [0, 0.02], [-half(i) * 0.5, 0.012], [-half(i), 0]], { closed: route.closed, vScale: 8 }));
@@ -139,9 +151,18 @@ export function makeRoads(kit) {
         kit.collision.triangles(g, sh.surface);
       }
     }
-    // carve terrain under the road
-    kit.terrainRef?.carve(route, (sh?.width || 0) + 1.5, spec.carveBlend ?? 14);
-    const r = { id: spec.id || `road${roads.length}`, spec, route, rows, width, shoulder: sh?.width || 0, tag: spec.tag || 'road' };
+    // carve terrain under the road (not inside tunnels, not under bridge decks standing clear of the ground)
+    let skip = null;
+    if (bridges.length || tunnels.length) {
+      skip = new Uint8Array(route.n);
+      for (let i = 0; i < route.n; i++) {
+        const d = route.dist[i];
+        if (segAt(tunnels, d)) skip[i] = 1;
+        else if (segAt(bridges, d) && route.y[i] - kit.rawGroundY(route.x[i], route.z[i]) > 1.2) skip[i] = 1;
+      }
+    }
+    kit.terrainRef?.carve(route, (sh?.width || 0) + 1.5, spec.carveBlend ?? 14, skip);
+    const r = { id: spec.id || `road${roads.length}`, spec, route, rows, width, shoulder: sh?.width || 0, tag: spec.tag || 'road', bridges, tunnels };
     roads.push(r);
     return r;
   }
@@ -172,7 +193,8 @@ export function makeRoads(kit) {
     return g;
   }
 
-  /** Flat patch that hides overlapping road ribbons at a junction and cuts markings / walls around it. */
+  /** Flat patch that hides overlapping road ribbons at a junction and cuts markings / walls around it.
+   *  pos: [x, z] (height from the ground) or [x, y, z] (exact road height, needed on slopes and decks). */
   function junction({ pos, radius = 12, surface = 'asphalt', shape = 'round' }) {
     const y = pos.length === 3 ? pos[1] : kit.groundY(pos[0], pos[pos.length - 1]);
     const x = pos[0], z = pos[pos.length - 1];
@@ -182,15 +204,23 @@ export function makeRoads(kit) {
     const mat = surface === 'concrete' ? mats.concrete() : mats.asphalt();
     kit.addStatic(g, mat, { cast: false, receive: true });
     kit.collision.triangles(g, surface);
-    junctions.push({ x, z, r: radius });
+    junctions.push({ x, y, z, r: radius });
   }
-  const inJunction = (x, z, pad = 0) => junctions.some((j) => (x - j.x) ** 2 + (z - j.z) ** 2 < (j.r + pad) ** 2);
+  /** Inside a junction patch? With y, only patches at that height count (decks pass over ground junctions). */
+  const inJunction = (x, z, pad = 0, y = null) => junctions.some((j) => (x - j.x) ** 2 + (z - j.z) ** 2 < (j.r + pad) ** 2 && (y == null || Math.abs(y - j.y) < 4));
+  /** Another road's deck or surface under (x, z), more than `below` metres lower than y. */
+  const roadBelow = (self, x, z, y, pad = 2.5, below = 3) => roads.some((o) => {
+    if (o === self) return false;
+    const p = o.route.project(x, z);
+    return p.dist < p.half + o.shoulder + pad && y - o.route.y[p.i] > below;
+  });
 
   // ---------------------------------------------------------------------------- phase 2
   function decorate(r) {
-    const { spec, route, rows } = r;
+    const { spec, route, rows, bridges, tunnels } = r;
     const half = (i) => route.half[i];
     const lift = 0.028;
+    const inTunnel = (i) => !!segAt(tunnels, route.dist[i]);
     // markings: list of { lat, w, color, dash }
     const marks = [];
     const style = spec.markings ?? 'center-dashed';
@@ -220,15 +250,18 @@ export function makeRoads(kit) {
         if (mk.dash) on = d % (mk.dash[0] + mk.dash[1]) < mk.dash[0];
         const lat = mk.lat(R.i);
         const px = R.p.x + R.n.x * lat, pz = R.p.z + R.n.z * lat;
-        if (inJunction(px, pz, 2)) on = false;
+        if (inJunction(px, pz, 2, R.p.y)) on = false;
         if (on) { if (!cur) { cur = []; groups.push(cur); } cur.push(R); } else cur = null;
       }
-      const geos = [];
+      const c = MARK[mk.color] || MARK.white;
       for (const gRows of groups) {
         if (gRows.length < 2) continue;
-        geos.push(faceUp(sweepVar(gRows, (i) => { const l = mk.lat(i); return [[l + mk.w / 2, lift], [l - mk.w / 2, lift]]; }, { closed: false, vScale: 4 })));
+        const g = faceUp(sweepVar(gRows, (i) => { const l = mk.lat(i); return [[l + mk.w / 2, lift], [l - mk.w / 2, lift]]; }, { closed: false, vScale: 4 }));
+        const col = new Float32Array(g.attributes.position.count * 3);
+        for (let v = 0; v < col.length; v += 3) { col[v] = c.r; col[v + 1] = c.g; col[v + 2] = c.b; }
+        g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        kit.addStatic(g, mats.mark(), { cast: false, receive: true });
       }
-      for (const g of geos) kit.addStatic(g, mats[mk.color](), { cast: false, receive: true });
     }
     // kerbs on the inside (and outside if 'both') of corners
     if (spec.curbs) {
@@ -266,45 +299,122 @@ export function makeRoads(kit) {
         const d = route.dist[R.i];
         const type = segs.find((sg) => d >= (sg.from ?? 0) && d < (sg.to ?? Infinity))?.[sideName] || null;
         const lat = side * off(R.i);
-        const blocked = !type || inJunction(R.p.x + R.n.x * lat, R.p.z + R.n.z * lat, 4);
+        const blocked = !type || inTunnel(R.i) || inJunction(R.p.x + R.n.x * lat, R.p.z + R.n.z * lat, 4, R.p.y);
         if (blocked || type !== runType) { flush(); runType = blocked ? null : type; }
         if (!blocked) run.push(R);
       }
       if (route.closed && run.length === rows.length) run.push(rows[0]);
       flush();
     }
-    // street lights
-    if (spec.lights) {
-      const L = { spacing: 32, side: 'both', height: 8.5, color: 0xffc27a, intensity: 120, range: 34, offset: 0.8, style: 'cobra', ...spec.lights };
-      let d = 0, n = 0;
+    // street lights (segments may change spacing / colour or switch them off)
+    const lightSegs = segList(spec.lights);
+    if (lightSegs.length) {
+      let d = 0, n = 0, prevSeg = null;
       for (let k = 1; k < rows.length; k++) {
         d += rows[k].p.distanceTo(rows[k - 1].p);
+        const seg = segAt(lightSegs, route.dist[rows[k].i]);
+        if (seg !== prevSeg) { prevSeg = seg; d = 0; }
+        if (!seg || seg.off) continue;
+        const L = { spacing: 32, side: 'both', height: 8.5, color: 0xffc27a, intensity: 120, range: 34, offset: 0.8, style: 'cobra', ...seg };
         if (d < L.spacing) continue;
         d = 0; n++;
         const R = rows[k];
+        if (inTunnel(R.i)) continue;
         const sides = L.side === 'both' ? [1, -1] : L.side === 'left' ? [1] : L.side === 'right' ? [-1] : [n % 2 ? 1 : -1];
         for (const s of sides) {
           const lat = s * (half(R.i) + (r.shoulder || 0) + L.offset);
           const x = R.p.x + R.n.x * lat, z = R.p.z + R.n.z * lat;
-          if (inJunction(x, z, 1)) continue;
-          const y = kit.groundY(x, z, R.p.y);
+          if (inJunction(x, z, 1, R.p.y)) continue;
+          const onDeck = segAt(bridges, route.dist[R.i]) && R.p.y - kit.rawGroundY(x, z) > 1.5;
+          const y = onDeck ? R.p.y : kit.groundY(x, z, R.p.y);
           const heading = Math.atan2(-R.n.x * s, -R.n.z * s); // arm points over the road
           kit.props.streetLamp([x, y, z], heading, { height: L.height, color: L.color, intensity: L.intensity, range: L.range, style: L.style });
         }
       }
     }
-    // bridge pillars where the road floats above the ground
-    if (spec.bridge || spec.pillars) {
-      for (let k = 0; k < rows.length; k += Math.round((spec.pillarSpacing ?? 28) / 2)) {
+    // bridge decks: pillars where the deck stands clear, skirt walls down to the ground on low ramps
+    if (bridges.length) {
+      const spacing = Math.round((spec.pillarSpacing ?? 28) / 2);
+      for (let k = 0; k < rows.length; k += spacing) {
         const R = rows[k];
+        if (!segAt(bridges, route.dist[R.i])) continue;
         const gy = kit.rawGroundY(R.p.x, R.p.z);
         const h = R.p.y - gy;
-        if (h < 2.5) continue;
+        if (h < 4.5 || gy < (kit.waterLevel ?? -Infinity) - 30) continue;
+        if (inJunction(R.p.x, R.p.z, 3) || roadBelow(r, R.p.x, R.p.z, R.p.y)) continue; // keep streets underneath clear
         kit.props.pillar([R.p.x, gy, R.p.z], Math.atan2(R.t.x, R.t.z), h - 0.9, Math.max(2, half(R.i) * 0.5));
       }
-      // deck underside
-      const g = faceUp(sweepVar(rows, (i) => [[half(i) + (r.shoulder || 0), -0.06], [half(i) + (r.shoulder || 0), -0.9], [-half(i) - (r.shoulder || 0), -0.9], [-half(i) - (r.shoulder || 0), -0.06]], { closed: route.closed, vScale: 8 }));
+      let run = [];
+      const W = (i) => half(i) + (r.shoulder || 0);
+      const flush = () => {
+        if (run.length > 1) {
+          const g = faceUp(sweepVar(run, (i) => {
+            const h = route.y[i] - kit.rawGroundY(route.x[i], route.z[i]);
+            const depth = h < 5 ? Math.max(0.9, h + 0.4) : 0.9; // low ramps read as solid retaining walls
+            return [[W(i), -0.06], [W(i), -depth], [-W(i), -depth], [-W(i), -0.06]];
+          }, { closed: false, vScale: 8 }));
+          kit.addStatic(g, mats.wall(), { cast: true, receive: true });
+        }
+        run = [];
+      };
+      for (const R of rows) { if (segAt(bridges, route.dist[R.i])) run.push(R); else flush(); }
+      if (route.closed && run.length === rows.length) run.push(rows[0]);
+      flush();
+    }
+    for (const T of tunnels) buildTunnel(r, T);
+  }
+
+  /** Tunnel shell: tiled walls, dark vault, lamp rows, portal headwalls with name boards, side collision. */
+  function buildTunnel(r, T) {
+    const { route, rows } = r;
+    const i0 = Math.max(0, route.indexAt(T.from) - 1), i1 = Math.min(rows.length - 1, route.indexAt(T.to) + 1);
+    const run = rows.slice(i0, i1 + 1);
+    if (run.length < 2) return;
+    const W = (i) => route.half[i] + (r.shoulder || 0) + 0.8;
+    const tile = sweepVar(run, (i) => [[W(i), -0.3], [W(i), 3.4]], { vScale: 4 });
+    const tile2 = sweepVar(run, (i) => [[-W(i), 3.4], [-W(i), -0.3]], { vScale: 4 });
+    const vault = sweepVar(run, (i) => { const w = W(i); return [[w, 3.4], [w, 4.5], [w * 0.88, 5.9], [w * 0.62, 6.9], [w * 0.3, 7.4], [0, 7.55], [-w * 0.3, 7.4], [-w * 0.62, 6.9], [-w * 0.88, 5.9], [-w, 4.5], [-w, 3.4]]; }, { vScale: 6 });
+    kit.addStatic(tile, mats.tunnelTile(), { cast: false, receive: true });
+    kit.addStatic(tile2, mats.tunnelTile(), { cast: false, receive: true });
+    kit.addStatic(vault, mats.tunnelVault(), { cast: true, receive: true });
+    // lamp boxes along both upper walls, real (pooled) lights every 30 m, on day and night
+    if (!kit.props.has?.('tunnelLamp')) { const g = new THREE.BoxGeometry(0.35, 0.16, 1.4); kit.props.define('tunnelLamp', [{ geometry: g, material: mats.tunnelLamp(), castShadow: false }]); }
+    let acc = 0, n = 0;
+    for (let k = 1; k < run.length; k++) {
+      acc += run[k].p.distanceTo(run[k - 1].p);
+      if (acc < 7) continue;
+      acc = 0; n++;
+      const R = run[k], w = W(R.i);
+      for (const s of [1, -1]) {
+        const p = R.p.clone().addScaledVector(R.n, s * (w - 0.35)).addScaledVector(R.u, 4.8);
+        kit.props.place('tunnelLamp', [p.x, p.y, p.z], Math.atan2(R.t.x, R.t.z), 1, null, { collide: false });
+      }
+      if (n % 4 === 0) { const p = R.p.clone().addScaledVector(R.u, 5.4); kit.light({ pos: [p.x, p.y, p.z], color: T.light ?? 0xffc07a, intensity: 70, range: 24, nightOnly: false }); }
+    }
+    // side walls for the car body
+    for (const s of [1, -1]) {
+      const pts = run.map((R) => { const p = R.p.clone().addScaledVector(R.n, s * (W(R.i) - 0.15)); return [p.x, p.z]; });
+      kit.world.addWallPath(pts, { y0: Math.min(...run.map((R) => R.p.y)) - 1, y1: Math.max(...run.map((R) => R.p.y)) + 7, thickness: 0.5, kind: 'wall', bounce: 0.1, friction: 0.3 });
+    }
+    // portals: headwall frame around the opening, name board above
+    for (const [R, dir] of [[run[0], -1], [run[run.length - 1], 1]]) {
+      const w = W(R.i);
+      const t = R.t.clone().multiplyScalar(dir);
+      const basis = new THREE.Matrix4().makeBasis(R.n, UP, t).setPosition(R.p);
+      const parts = [];
+      const box = (sx, sy, sz, x, y, z) => { const g = new THREE.BoxGeometry(sx, sy, sz); g.translate(x, y, z); parts.push(g); };
+      box(4, 10.5, 1.4, w + 2, 4.6, 0.7);            // piers
+      box(4, 10.5, 1.4, -w - 2, 4.6, 0.7);
+      box(2 * w + 8, 3.0, 1.4, 0, 8.6, 0.7);         // lintel over the vault
+      box(2 * w + 9, 0.5, 1.8, 0, 10.1, 0.7);        // coping
+      const g = kit.merge(parts); g.applyMatrix4(basis);
       kit.addStatic(g, mats.wall(), { cast: true, receive: true });
+      if (T.zh && kit.hsigns) {
+        const rect = kit.hsigns.slot(T.zh, 3);
+        const sg = kit.hsigns.geometry(rect, 7.5, 1.6, 0.2);
+        sg.rotateY(Math.PI / 2); sg.translate(0, 8.6, 1.5); sg.applyMatrix4(basis);
+        kit.addStatic(sg, kit.hsigns.material, { cast: false, receive: false });
+      }
     }
   }
 

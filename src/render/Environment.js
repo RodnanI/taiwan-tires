@@ -225,6 +225,8 @@ export class Environment {
     const far = camera?.far || 2000;
     const weatherFog = this.weather === 'fog' ? 0.006 : this.weather === 'rain' ? 0.0025 : 0;
     this.fog.color.copy(fogC).lerp(new THREE.Color(0x6c7076).multiplyScalar(1 - this.night * 0.85), overcast * 0.5);
+    // below the horizon the sky shows the fog colour: geometry clipped by the far plane fades into it seamlessly
+    u.ground.value.copy(this.fog.color);
     this.fog.density = Math.max(this.def.fogDensity + weatherFog, 1.7 / far);
     // follow focus
     if (focus) {

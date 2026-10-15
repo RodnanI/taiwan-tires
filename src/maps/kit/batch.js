@@ -8,8 +8,10 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _p = new THREE.Vector3(), _e = new THREE.Euler();
 
 export class Instancer {
-  constructor(root) { this.root = root; this.types = new Map(); }
-  /** Define a prop type made of parts [{ geometry, material, castShadow }]. */
+  /** cell: instances of a big, spread-out prop set are split into cells of this size (m) so frustum and
+   *  distance culling work per cell instead of drawing every instance of the map every frame. */
+  constructor(root, { cell = 420, splitAt = 160 } = {}) { this.root = root; this.types = new Map(); this.cell = cell; this.splitAt = splitAt; this.culled = []; }
+  /** Define a prop type made of parts [{ geometry, material, castShadow }]. maxDistance hides far cells. */
   define(name, parts, { castShadow = true, receiveShadow = false, maxDistance = Infinity } = {}) {
     if (!this.types.has(name)) this.types.set(name, { parts, castShadow, receiveShadow, maxDistance, matrices: [], colors: [] });
     return name;
@@ -28,22 +30,39 @@ export class Instancer {
   }
   finalize() {
     const out = [];
+    const col = new THREE.Color();
     for (const [name, t] of this.types) {
-      if (!t.matrices.length) continue;
-      for (const part of t.parts) {
-        const mesh = new THREE.InstancedMesh(part.geometry, part.material, t.matrices.length);
-        t.matrices.forEach((m, i) => mesh.setMatrixAt(i, m));
-        if (t.colors.some(Boolean)) t.colors.forEach((c, i) => mesh.setColorAt(i, new THREE.Color(c ?? 0xffffff)));
+      const n = t.matrices.length;
+      if (!n) continue;
+      let groups = [t.matrices.map((_, i) => i)];
+      if (n > this.splitAt) {
+        const cells = new Map();
+        t.matrices.forEach((m, i) => { const k = `${Math.floor(m.elements[12] / this.cell)},${Math.floor(m.elements[14] / this.cell)}`; if (!cells.has(k)) cells.set(k, []); cells.get(k).push(i); });
+        if (cells.size > 1) groups = [...cells.values()];
+      }
+      const tinted = t.colors.some(Boolean);
+      for (const ids of groups) for (const part of t.parts) {
+        const mesh = new THREE.InstancedMesh(part.geometry, part.material, ids.length);
+        ids.forEach((id, k) => mesh.setMatrixAt(k, t.matrices[id]));
+        if (tinted) ids.forEach((id, k) => mesh.setColorAt(k, col.set(t.colors[id] ?? 0xffffff)));
         mesh.instanceMatrix.needsUpdate = true;
         mesh.castShadow = part.castShadow ?? t.castShadow;
         mesh.receiveShadow = t.receiveShadow;
         mesh.name = `inst:${name}`;
         mesh.computeBoundingSphere();
+        if (t.maxDistance < Infinity) { mesh.userData.maxDistance = t.maxDistance; this.culled.push(mesh); }
         this.root.add(mesh);
         out.push(mesh);
       }
     }
     return out;
+  }
+  /** Hide cells beyond their prop's maxDistance (call every few frames with the camera position). */
+  cull(cam, scale = 1) {
+    for (const m of this.culled) {
+      const s = m.boundingSphere;
+      m.visible = cam.distanceTo(s.center) - s.radius < m.userData.maxDistance * scale;
+    }
   }
 }
 

@@ -10,7 +10,7 @@ import { SignAtlas } from './signs.js';
 import { rng, fbm, ridged, valueNoise, hashString } from '../../core/math.js';
 import { noiseField, normalFromHeight } from '../../render/textures.js';
 
-export function createMapKit({ root, world, M, lights, env, quality, seed = 1 }) {
+export function createMapKit({ root, world, M, lights, env, quality, seed = 1, batchChunk = 180 }) {
   const kit = {
     THREE, M, root, world, env, quality,
     detail: quality.detail ?? 1, vegetation: quality.vegetation ?? 1,
@@ -23,10 +23,15 @@ export function createMapKit({ root, world, M, lights, env, quality, seed = 1 })
     terrainRef: null,
     waterLevel: -Infinity,
   };
-  kit.batch = new StaticBatcher(root, 180);
+  kit.batch = new StaticBatcher(root, batchChunk);
   kit.inst = new Instancer(root);
+  // instanced cells fade out with the preset's draw distance (forests stop at the fog)
+  kit.cullScale = Math.min(1.8, Math.max(0.35, (quality.drawDistance ?? 1600) / 1600));
   kit.signs = new SignAtlas(M);
   kit.nightMaterials.push(kit.signs.material);
+  // horizontal boards (road signs, tunnel names, shop fascias): created on first use
+  let hsigns = null;
+  Object.defineProperty(kit, 'hsigns', { get() { if (!hsigns) { hsigns = new SignAtlas(M, { cols: 4, rows: 16, slotW: 256, slotH: 64, horizontal: true }); kit.nightMaterials.push(hsigns.material); } return hsigns; } });
 
   kit.merge = (geos) => {
     const list = geos.map((g) => { const x = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(x.attributes)) if (!['position', 'normal', 'uv'].includes(k)) x.deleteAttribute(k); if (!x.attributes.uv) x.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(x.attributes.position.count * 2), 2)); return x; });

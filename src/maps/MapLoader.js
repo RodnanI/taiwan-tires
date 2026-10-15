@@ -32,9 +32,14 @@ export class MapInstance {
     }
     return best;
   }
-  update(dt, night) {
+  update(dt, night, camera = null) {
     this.time += dt;
-    for (const fn of this.kit.animated) fn(dt, this.time);
+    for (const fn of this.kit.animated) fn(dt, this.time, camera);
+    // distance culling of big instanced prop sets (forests, street furniture), a few times a second
+    if (camera && this.kit.inst.culled.length && (this._cullT = (this._cullT || 0) + dt) > 0.25) {
+      this._cullT = 0;
+      this.kit.inst.cull(camera.position, this.kit.cullScale ?? 1);
+    }
     if (Math.abs((this._night ?? -1) - night) > 0.02) {
       this._night = night;
       for (const m of this.kit.nightMaterials) {
@@ -57,7 +62,7 @@ export class MapInstance {
 export async function loadMap(def, { M, lights, env, quality, onProgress = () => {} }) {
   const inst = new MapInstance(def);
   const step = async (p, label) => { onProgress(p, label); await new Promise((r) => setTimeout(r, 0)); };
-  const kit = createMapKit({ root: inst.root, world: inst.world, M, lights, env, quality, seed: def.seed });
+  const kit = createMapKit({ root: inst.root, world: inst.world, M, lights, env, quality, seed: def.seed, batchChunk: def.batchChunk });
   inst.kit = kit;
   await step(0.05, 'Terrain');
   if (def.terrain) kit.terrain(def.terrain);

@@ -38,6 +38,7 @@ export function normalizeMap(raw) {
     build: typeof raw.build === 'function' ? raw.build : null,
     preview: raw.preview || { colors: ['#1d1a16', '#e39b3d'] },
     seed: raw.seed ?? 1,
+    batchChunk: raw.batchChunk ?? 180,
     raw,
   };
   if (!events.length) problems.push('no events defined (free roam still works)');

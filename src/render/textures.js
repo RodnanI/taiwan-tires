@@ -99,6 +99,12 @@ const GENERATORS = {
     const col = fromField(n, (x, y) => { const a = h[y * n + x], b = f[y * n + x]; return [98 + a * 50 + b * 25, 78 + a * 38 + b * 20, 56 + a * 26 + b * 14]; });
     return { map: tex(col), normalMap: normalFromHeight(f, n, 5) };
   },
+  /** Neutral ground detail (near white): terrains tint it with vertex colours per region. */
+  ground(n) {
+    const h = noiseField(n, 6, 4, 13), f = noiseField(n, 48, 2, 14), g = noiseField(n, 160, 1, 15);
+    const col = fromField(n, (x, y) => { const k = y * n + x; const v = 222 + (h[k] - 0.5) * 40 + (f[k] - 0.5) * 46 + (g[k] - 0.5) * 30; return [v, v * 0.995, v * 0.985]; });
+    return { map: tex(col), normalMap: normalFromHeight(f, n, 1.4) };
+  },
   carbon(n) {
     const c = makeCanvas(n, n), g = c.getContext('2d');
     const cell = n / 16;

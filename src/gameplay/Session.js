@@ -314,7 +314,7 @@ export class Session {
     // environment + lights + map animation
     this.env.update(this.paused ? 0 : dt, this.player.root.position, cam, { vel: ph.vel });
     this.lights.update(this.player.root.position, cam, night);
-    this.map.update(dt, night);
+    this.map.update(dt, night, cam);
     this.env.updateCube(g.renderer.three, _v.copy(this.player.root.position).setY(this.player.root.position.y + 1.0), [this.player.root]);
     // wetness affects grip
     for (const v of this.vehicles) v.physics.wetness = this.env.wetness;
