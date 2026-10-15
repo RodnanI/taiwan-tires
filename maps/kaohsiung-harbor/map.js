@@ -9,7 +9,7 @@ export default {
   region: 'Kaohsiung',
   description: 'Container terminal proving ground. Night shifts, sodium lights, and a quay straight that ends in the sea if you miss the braking point.',
   placeholder: true,
-  order: 0,
+  order: 1,
   seed: 7,
   preview: { colors: ['#0f1418', '#e39b3d'] },
 

@@ -2,7 +2,9 @@
 
 One folder per map: `maps/<id>/map.js`, default-exporting a plain object. Auto-discovered by the build.
 `maps/_template/map.js` is a small working map with every feature commented (folders starting with `_` are
-not loaded). `maps/kaohsiung-harbor/map.js` is the full test map (placeholder) and the best real example.
+not loaded). `maps/formosa/` is the full detailed map and the reference for everything below (terrain
+function, tunnels, fitted junctions, pads, builders split into modules); `maps/kaohsiung-harbor/map.js` is the
+older single-file test map (placeholder).
 
 ```bash
 cp -r maps/_template maps/my-map              # then set id: 'my-map' (must equal the folder name)
@@ -59,8 +61,16 @@ export default {
   walls: { left: 'barrier', right: 'guardrail' },       // or one string, or [{ from: m, to: m, left, right }]
   wallOffset: 0.6,
   lights: { spacing: 32, side: 'both' | 'left' | 'right' | 'alternate', height: 8.5, color: 0xfff0d8, intensity: 120, range: 34 },
-  banking: 0 | deg | 'auto', bridge: false, smoothY: true, smoothPasses: 6, step: 2, surface: 'asphalt', redCurb: false }
+  banking: 0 | deg | 'auto', bridge: false, smoothY: true, smoothPasses: 6, step: 2, surface: 'asphalt', redCurb: false,
+  tunnels: [{ from: m, to: m, name: 'Wanli Tunnel', zh: '萬里隧道' }] }
 ```
+
+- **Segments**: `walls`, `lights` and `bridge` take one spec for the whole road or a list of
+  `[{ from, to, ... }]` in metres along the road (a bridge deck in the middle of a mountain road, lights only
+  through a town). The first segment that covers a station wins, so merge left and right into one segment.
+- **Tunnels**: the hill stays on top (no carving between `from` and `to`), the kit builds a tiled shell,
+  lamps, portals and a name board. Put portals where the hillside is about 10 m above the road. If your
+  terrain function pulls hills to roads itself, leave the tunnel interiors alone (see `formosa/terrain.js`).
 
 - Points are Catmull-Rom interpolated and resampled every `step` metres. Use enough points for curves
   (every 20 to 60 m); the spline does not overshoot much but sharp hairpins need 4 or more points.
@@ -71,8 +81,12 @@ export default {
 - `markings`: `center-dashed`, `center-solid`, `double-yellow`, `race` (white edge lines + start grid).
   Taiwanese urban roads: `double-yellow` centre, white lane lines; `redCurb: true` for red no-parking kerbs.
 - Wall types: `guardrail`, `barrier` (concrete), `wall`, `tires`.
-- Junctions: `{ pos: [x, z], radius: 12, surface: 'asphalt', shape: 'round' }` flattens a patch where roads
-  meet and cuts markings and walls there.
+- Junctions: `{ pos: [x, z], radius: 12, surface: 'asphalt', shape: 'round' }` lays a patch where roads
+  meet and cuts markings and walls there. `pos: [x, y, z]` gives the exact height (decks pass over ground
+  junctions; only patches within 4 m of a road's height cut it). On a grade use `fit: true`: the patch bends
+  to the roads that meet there and shapes the ground round it, so no rim floats or sinks.
+- Open roads keep their exact end heights through `smoothY` (they meet other roads there); closed roads
+  smooth all the way round. Where two roads carve the same ground the lower one wins.
 
 ## Events
 
@@ -106,11 +120,12 @@ meshes to the scene yourself.
 | `kit.mesh(geo, mat, { pos, rot, scale, cast, receive })` | Static mesh, merged into batches by material. |
 | `kit.addStatic(geo, mat, { cast, receive })` | Same, for geometry already in world space. |
 | `kit.add(object3d)` | Dynamic object (moves or animates): not batched. |
-| `kit.animate((dt, time) => ...)` | Per-frame callback (rotating signs, flags, water). |
+| `kit.animate((dt, time, camera) => ...)` | Per-frame callback (rotating signs, lighthouse beams, steam that faces the camera). |
 | `kit.light({ pos, color, intensity, range, nightOnly })` | Virtual light. Hundreds are fine: only the nearest N (graphics setting) become real lights. |
 | `kit.collision.box({ x, z, hx, hz, rotY, y0, y1, kind })` | Solid block (buildings, walls, containers). |
 | `kit.collision.cylinder({ x, z, r, y0, y1 })`, `.wall(ax, az, bx, bz, opts)`, `.wallPath(points, opts)` | Poles, thin walls, fences. |
 | `kit.collision.triangles(geometry, surface)` | Make any geometry drivable (ramps, plazas, car parks). |
+| `kit.pad({ poly: [[x, z]...], y, surface, blend, material })` | Flatten the terrain to `y` inside a polygon and lay a drivable asphalt, concrete or gravel surface on it (car parks, quays, plazas, drift venues). Call before the kit meshes the terrain (any time in `build`). |
 | `kit.groundY(x, z)`, `kit.rawGroundY(x, z)` | Ground height with and without road carving. |
 | `kit.road(spec)`, `kit.junction(spec)` | Same as the data arrays (for generated roads; the menus can't preview these). |
 | `kit.building({ x, z, w, d, rotY, style, floors, h, color, signs, qilou, rooftop })` | One building with collision. Styles: `shophouse`, `apartment`, `office`, `warehouse`. |
@@ -119,7 +134,9 @@ meshes to the scene yourself.
 | `kit.supertall({ pos, height, segments, color })` | Stacked-pagoda landmark tower (Taipei 101 style silhouette). |
 | `kit.props.place(name, [x, y, z], rotY, scale, color, { collide })` | Instanced prop with its collider. |
 | `kit.props.streetLamp(pos, heading, opts)`, `kit.props.containerStack(pos, rotY, { long, high })` | Prop helpers. |
-| `kit.props.define(name, parts)` | Register a custom instanced prop (parts = [{ geometry, material }]). |
+| `kit.props.define(name, parts, { maxDistance })` | Register a custom instanced prop (parts = [{ geometry, material, castShadow, tint }]). `tint: false` keeps a part out of the instance colour (lamps, tyres). `maxDistance` hides far cells. |
+| `kit.hsigns` | Horizontal sign atlas (road signs, fascias, gate boards): `slot(text, palette)`, `geometry(rect, w, h, depth)`. |
+| `kit.roadMats` | The road materials (`asphalt`, `concrete`, `mark`, `curb`, ...) for paths and paint that should match the roads. |
 | `kit.signs.slot(text, palette)` + `kit.signs.geometry(rect, w, h, depth)` | Traditional Chinese shop signs from a shared atlas (one draw call). Use `kit.signs.material`. |
 | `kit.M` | Material factory: `M.surface({...})`, `M.textured(key, {...})` with keys from `src/render/textures.js` (`asphalt concrete grass dirt brushed`...), `M.shared(key, fn)`. |
 | `kit.env.addWettable(material)` | Material gets darker and glossier in rain (roads already are). |
@@ -129,7 +146,14 @@ meshes to the scene yourself.
 
 Props catalogue (`kit.props.place` names): `palm tree bush cone waterBarrier scooter pillar mirror
 trafficLight vending bollard waterTank acUnit cage crate drum bench busStop betelStand powerPole
-lampPole lampArm railPost`. Add new ones in `src/maps/kit/props.js` (instanced, one draw call each).
+lampPole lampArm railPost`, vegetation `canopy betelPalm banana cedar broadleaf banyan cherry bamboo
+silvergrass shrub rock` (white materials: pass a colour to tint them), `lantern chevron parkedCar shrine stall
+umbrella`. Add new ones in `src/maps/kit/props.js` (instanced, one draw call each).
+
+Instanced props are split into 560 m cells for frustum culling; big sets of small things (trees, scooters,
+parked cars) also stop drawing beyond a per-prop distance scaled by the preset's draw distance (`CULL` in
+`props.js`). Static geometry is merged per material and per `batchChunk` metres (top-level map field,
+default 180; a 5 km map wants 300 or more to keep the object count down).
 
 ## Terrain
 
@@ -142,6 +166,14 @@ terrain: { size: [4000, 4000], center: [0, 0], cell: 4, surface: 'grass',
 The heightfield is used for rendering and physics with the identical triangulation (no floating cars).
 `cell` 4 m is the default; 2 m for detailed hills costs 4x memory. Colour follows slope and height.
 
+- `lodTolerance` (m, default 0.12): render blocks of 16 cells coarsen to 2, 4 or 8 cells where the coarse
+  mesh stays within this of the physics heights. Flat land (sea floor, city, paddies) then costs almost
+  nothing; blocks touching roads always start at full resolution.
+- `colorFn(x, z, h, slope, out)` sets the vertex colour per cell (regions, beaches, rock, meadows) and
+  `surfaceFn(x, z, h, slope)` the physics surface (`'sand'` on beaches, `'gravel'` on scree).
+- A big map with hand-placed geography wants `height: (x, z) => y` from its own module (see
+  `formosa/terrain.js`: regions, peaks, ridges, coast, river, and road corridors pulled into the hills).
+
 ## Surfaces
 
 Collision triangles and terrain carry a surface id that changes grip, rolling resistance, dust and sound:
@@ -153,7 +185,7 @@ Tyre compounds react differently (rally tyres keep grip on dirt, slicks do not).
 | | Target | Hard limit |
 |---|---|---|
 | Objects after batching (validator "objects") | under 1500 | 2500 |
-| Triangles in the whole map | under 3M | 5M |
+| Triangles in the whole map | under 3M (a 5 km map with forests and a city: under 4.5M) | 5M |
 | Colliders | no limit that matters (broadphase grid) | |
 | Virtual lights | hundreds | |
 

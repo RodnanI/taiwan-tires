@@ -1,4 +1,8 @@
-// FORMOSA: northern Taiwan squeezed into 5 x 5 km. Work in progress.
+// FORMOSA: northern Taiwan squeezed into 5 x 5 km. The Taipei basin (avenues, the night circuit, the elevated,
+// temples, the tower, night market), Yangmingshan (the touge, the Seven Star loop, the sulphur vents), the
+// north coast (Tamsui, four tunnels, Yehliu, the fishing harbour, lighthouses), Jiufen on its ridge and the
+// paddy valley, all joined by one 15 km ring road. Geography in geo.js and terrain.js, roads in routes.js and
+// city-plan.js, everything built on top in build/.
 import { heightAt, BOUNDS, terrainColor, terrainSurface } from './terrain.js';
 import { TOUGE, RING, QIXING_LOOP, JIUFEN, RALLY, GUANDU, YEHLIU, RIVERSIDE, FARM_LINK, JUNCTIONS, HARBOUR_RAMP } from './routes.js';
 import { avenueRoads, cityJunctions, CIRCUIT, ELEVATED } from './city-plan.js';
@@ -9,12 +13,12 @@ export default {
   name: 'Formosa',
   nameZh: '福爾摩沙',
   region: 'Northern Taiwan',
-  description: 'Work in progress.',
+  description: 'Northern Taiwan in one island-sized playground: night races through the Taipei grid, the Yangmingshan touge, four tunnels along the north coast, the lantern street of Jiufen and gravel between the paddies.',
   order: 0,
   seed: 23,
   preview: { colors: ['#10161a', '#e0503a'] },
   environment: { time: 19.4, timeScale: 0, weather: 'clear', fogDensity: 0.0004, cityGlow: 0.45, glowColor: '#d0906a', clouds: 0.35 },
-  spawn: { pos: [-850, null, 500], heading: 180 },
+  spawn: { pos: [-846, null, 610], heading: 0 },
   terrain: { size: [BOUNDS.x1 - BOUNDS.x0, BOUNDS.z1 - BOUNDS.z0], center: [(BOUNDS.x0 + BOUNDS.x1) / 2, (BOUNDS.z0 + BOUNDS.z1) / 2], cell: 4, surface: 'grass', height: heightAt, lodTolerance: 0.35, material: 'ground', colorFn: terrainColor, surfaceFn: terrainSurface },
   water: { level: 0, size: 14000, center: [0, 0], color: 0x0b2630 },
   roads: [

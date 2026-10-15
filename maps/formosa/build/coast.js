@@ -176,8 +176,9 @@ function harbour(kit, shared, r) {
     const h = 1 + Math.floor(r() * 4), c = pick(r, crateC), rot = r() * 0.4;
     for (let q = 0; q < h; q++) kit.props.place('fishCrate', [x, y + q * 0.36, z], rot, 1, c);
   }
-  for (let k = 0; k < 14; k++) kit.props.place('netPile', [x0 + 4 + r() * 28, y, zq + 2 + r() * 18], r() * 6, 0.8 + r() * 0.6, pick(r, [0x3f7d4c, 0xd86a2a, 0x2f5f9f, 0x5f8f3f]));
-  for (let k = 0; k < 10; k++) kit.props.place('drum', [x0 + 30 + r() * 6, y, zq + 26 + r() * 10], 0, 1);
+  // nets along the quay edge in front of the market, drums by the ramp (both clear of the drift loop)
+  for (let k = 0; k < 14; k++) kit.props.place('netPile', [1628 + r() * 72, y, zq + 1.8 + r() * 2], r() * 6, 0.8 + r() * 0.6, pick(r, [0x3f7d4c, 0xd86a2a, 0x2f5f9f, 0x5f8f3f]));
+  for (let k = 0; k < 10; k++) kit.props.place('drum', [1700 + r() * 8, y, -1838 + r() * 8], 0, 1);
 }
 
 function beacon(kit, x, z, y, color) {

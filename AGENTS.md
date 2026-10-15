@@ -68,9 +68,9 @@ dist/           taiwan-tires.html, the shipped game (committed)
 tmp/            screenshots and scratch output (git-ignored)
 ```
 
-## Current state (foundation phase)
+## Current state
 
-All engine systems are in place and working. The three cars and the one map are **placeholders**
-(`placeholder: true`): low-detail prototype models and a compact test map (Kaohsiung Harbor) that exercises
-every system. The remaining work is content: detailed car models with interiors and the three real maps
-(countryside, mountain, downtown Taipei). See `ROADMAP.md`.
+All engine systems are in place and working. **Formosa** (`maps/formosa/`) is the first detailed map:
+northern Taiwan in 5 x 5 km with the Taipei basin, Yangmingshan, the north coast, Jiufen and a paddy valley
+joined by a 15 km ring road, and 17 events. The three cars and the old Kaohsiung Harbor test map are still
+**placeholders** (`placeholder: true`). Next: detailed car models with interiors. See `ROADMAP.md`.

@@ -34,16 +34,30 @@ Replace the placeholder models (keep or refine the specs). Each must meet the "d
 | Tenmaru RS-4 Type R (2006) | C class turbo flat-four AWD saloon | Mountain and rain hero, big wing, rally-flavoured interior. |
 | Yushan Typhoon GT (2019) | B class 5.0 V8 front-engine GT, Taiwan's fictional supercar maker | Expressway top speed, sideways power, modern digital cockpit. |
 
-## Phase 2: Three maps
+## Phase 2: Maps
 
 Each map: real-feeling Taiwanese places (no trademarks), at least five events, strict validation, and a
 look checked at Low and Ultra. See `maps/AGENTS.md`.
 
-| Map | Inspiration | Must have |
-|---|---|---|
-| Countryside | East Rift Valley and Provincial Highway 11 (Hualien / Taitung): rice paddies, betel palms, coastal cliffs, small towns, temples | Fast sweepers, a coastal sprint, gravel farm roads (rally tyres), a village drift zone. |
-| Mountain | Central mountain passes (Hehuanshan / Yangmingshan style): hairpins, cedar forest, fog, tea terraces | Touge battles uphill and downhill, tunnels, guardrails, night and fog weather, viewpoint car park. |
-| Downtown Taipei | Xinyi and Ximending at night: tower, neon, qilou arcades, elevated expressways, riverside roads | Circuit through the grid, expressway sprint on pillars, car park drift, time attack, dense signage. |
+**Formosa (done)** puts the three planned maps (countryside, mountain, downtown Taipei) into one connected
+world, northern Taiwan compressed into 5 x 5 km:
+
+- Taipei basin: seven by six avenues of tiled shophouses with qilou arcades, vertical signs and rooftop
+  sheds, the Dunhua roundabout night circuit, the Civic Elevated on pillars, the Xinyi supertall and mall,
+  the Longshan temple precinct, Da'an park, the university palm boulevard, the night market under the
+  elevated, riverside car park, scooters on every sidewalk, signals, bus stops.
+- Yangmingshan: the 3.7 km touge with a stacked hairpin wall, the Seven Star loop round the plateau,
+  silvergrass, cedar, the sulphur vents, the summit pavilion, the Grand Hotel above the city.
+- North coast: Tamsui and the Guandu red arch bridge, four lit tunnels, Yehliu's hoodoos, the Shimen wind
+  farm, the fishing harbour (quay, breakwaters with tetrapods, squid boats, fish market, Mazu temple),
+  lighthouses with sweeping beams, the Wanli cliff ledge.
+- Jiufen: four hairpins up from the harbour to the lantern street, the teahouse, the Wuzhi ridge road to
+  the summit loop.
+- Paddy valley: 2800 fields from flooded to golden, farmhouses, betel palms, Dongshan creek with fords,
+  the Wujie village temple, a gravel rally loop with a canal jump.
+
+Further maps (the east coast cliffs of Highway 11, the central mountains, the south) can reuse the
+Formosa builders in `maps/formosa/build/`.
 
 ## Phase 3: A living world
 
