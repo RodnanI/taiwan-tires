@@ -8,9 +8,9 @@ tuning with an AI tuner, and menus that live on the car's own infotainment scree
 No install, no server, no downloads: everything (cars, maps, textures, sounds, music) is generated in code.
 Progress saves in the browser.
 
-> Status: **foundation phase.** Every system works; the three cars and the map are placeholders (simple
-> prototype models and a compact test map). Detailed cars with full interiors and the three real maps
-> (countryside, mountains, downtown Taipei) are the next phases. See [ROADMAP.md](ROADMAP.md).
+> Status: **phase 1 done.** Every system works and the three hero cars are fully detailed, inside and out
+> (Hoshino Kaze 86 with pop-up lamps, Tenmaru RS-4 Type R, Yushan Typhoon GT). The map is still a compact
+> test map; the three real maps (countryside, mountains, downtown Taipei) are next. See [ROADMAP.md](ROADMAP.md).
 
 ## What is in
 

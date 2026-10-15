@@ -27,7 +27,7 @@ const strict = argv.includes('--strict');
 const physics = !argv.includes('--no-physics');
 
 // budgets (see vehicles/AGENTS.md and maps/AGENTS.md)
-const BUDGET = { carTris: 450000, carMeshes: 600, mapTris: 5000000, mapObjects: 2500 };
+const BUDGET = { carTris: 450000, carMeshes: 600, carTrisLod: 120000, carMeshesLod: 200, mapTris: 5000000, mapObjects: 2500 };
 
 let errors = 0, warnings = 0;
 const out = [];
@@ -41,6 +41,21 @@ const report = (id) => {
   };
 };
 const fmt = (n) => (n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : String(n));
+/** Broken geometry (NaN positions, zero or NaN normals) renders black or poisons the HDR post chain. */
+function badGeometry(root) {
+  const out = [];
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const p = o.geometry.attributes.position, n = o.geometry.attributes.normal;
+    let nan = 0, zero = 0;
+    for (let i = 0; i < p.count; i++) {
+      if (!Number.isFinite(p.getX(i) + p.getY(i) + p.getZ(i))) nan++;
+      if (n) { const l = Math.hypot(n.getX(i), n.getY(i), n.getZ(i)); if (!(l > 0.5)) zero++; }
+    }
+    if (nan || zero) { let path = [], q = o; while (q && path.length < 3) { path.push(q.name || q.type); q = q.parent; } out.push(`${path.join(' < ')}: ${nan} NaN positions, ${zero} bad normals of ${p.count}`); }
+  });
+  return out;
+}
 function countScene(root) {
   let meshes = 0, tris = 0;
   root.traverse((o) => {
@@ -91,7 +106,13 @@ for (const rel of content.vehicles) {
     capture(false);
     for (const c of captured) (c.startsWith('warn:') ? R.warn : R.err)(`build log: ${c.slice(0, 160)}`);
     const { meshes, tris } = countScene(v.root);
-    if (!interior) { R.info(`no-interior ${fmt(tris)} tris`); continue; }
+    for (const b of badGeometry(v.root).slice(0, 5)) R.err(`bad geometry (interior=${interior}) ${b}`);
+    if (!interior) {
+      R.info(`no-interior ${meshes} meshes, ${fmt(tris)} tris`);
+      if (tris > BUDGET.carTrisLod) R.warn(`${fmt(tris)} tris > budget ${fmt(BUDGET.carTrisLod)} without interior (AI / distant cars)`);
+      if (meshes > BUDGET.carMeshesLod) R.warn(`${meshes} meshes > budget ${BUDGET.carMeshesLod} without interior: merge static parts`);
+      continue;
+    }
     R.info(`${meshes} meshes, ${fmt(tris)} tris`);
     if (tris > BUDGET.carTris) R.warn(`${fmt(tris)} tris > budget ${fmt(BUDGET.carTris)} (with interior)`);
     if (meshes > BUDGET.carMeshes) R.warn(`${meshes} meshes > budget ${BUDGET.carMeshes}: merge static parts (kit.geo.merge)`);

@@ -75,6 +75,10 @@ export class Vehicle {
       if (!w) {
         const o = { radius: c.radius, width: c.width / 1000, rimRadius: c.radius * (kit._wheelOverride?.rimRatio ?? 0.66), style: rimStyle, color: visual.rimColor ?? kit._wheelOverride?.color, caliperColor: kit._wheelOverride?.caliperColor, ...(kit._wheelOverride || {}) };
         o.style = rimStyle;
+        o.front = front;
+        o.detail = this.detail * (this.withInterior ? 1 : 0.75); // AI and ghost cars get lighter wheels
+        o.compound = this.spec.tires?.compound;
+        if (o.brake == null) o.brake = { street: 1, sport: 2, race: 3 }[this.config.parts?.brakes] ?? 0;
         o.width = c.width / 1000 * (kit._wheelOverride?.widthScale ?? 1);
         w = kit.buildWheel(o);
       }
@@ -95,6 +99,9 @@ export class Vehicle {
     this.gauges = fin.gauges;
     this.steeringObj = fin.steering?.object || null;
     this.screen = fin.anchors.screen || null;
+    // optional per-frame hook from the model (pop-up lamps, wipers, active aero): animate(dt, state)
+    this.animateFn = typeof ret.animate === 'function' ? ret.animate : null;
+    this._animNow = 0;
     this.modelRoot.traverse((o) => { if (o.isMesh && o.castShadow === undefined) o.castShadow = true; });
     this.root.updateMatrixWorld(true);
   }
@@ -181,6 +188,12 @@ export class Vehicle {
     for (const m of this.lightMats.brake) m.emissiveIntensity = brake;
     for (const m of this.lightMats.reverse) m.emissiveIntensity = rev;
     if (this.spot) this.spot[0].intensity = this.headlightsOn ? 2600 : 0;
+    if (this.animateFn) {
+      const now = o.now || performance.now();
+      const dt = this._animNow ? Math.min(0.1, Math.max(0, (now - this._animNow) / 1000)) : 1;
+      this._animNow = now;
+      this.animateFn(dt, { lights: this.headlightsOn, brake: t.brake, reverse: ph.gearbox.gear === -1, speed: t.speed, steer: ph.controls.steer, throttle: ph.controls.throttle, rpm: ph.engine.rpm, night });
+    }
     // gauges (only when somebody can see them)
     if (o.cockpitVisible && this.gauges.length) {
       const tel = { rpm: ph.engine.rpm, speed: t.speed, gear: ph.gearbox.gear, boost: ph.engine.boost, boostMax: p.engine.boost?.max || 0 };
