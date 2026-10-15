@@ -38,7 +38,7 @@ export function makeProps(kit) {
     foliageSolid: () => M.shared('foliageSolid', () => M.surface({ color: 0xffffff, roughness: 0.9 })),
     trunk: () => M.shared('trunk', () => M.surface({ color: 0xffffff, roughness: 0.95 })),
     rock: () => M.shared('rockProp', () => M.surface({ color: 0xffffff, roughness: 0.95, flatShading: true })),
-    lanternRed: () => M.shared('lanternRed', () => { const m = M.surface({ color: 0x8a1410, emissive: 0xff3a1c, emissiveIntensity: 0.15, roughness: 0.6 }); m.userData.nightEmissive = [0.15, 2.8]; kit.nightMaterials.push(m); return m; }),
+    lanternRed: () => M.shared('lanternRed', () => { const m = M.surface({ color: 0x9a1a0e, emissive: 0xff3a0a, emissiveIntensity: 0.12, roughness: 0.6 }); m.userData.nightEmissive = [0.12, 1.25]; kit.nightMaterials.push(m); return m; }),
     chevron: () => M.shared('chevronSign', () => {
       const c = makeCanvas(64, 32), g = c.getContext('2d');
       g.fillStyle = '#f2c21b'; g.fillRect(0, 0, 64, 32); g.fillStyle = '#111';

@@ -9,6 +9,9 @@ import { buildRiver } from './river.js';
 import { buildTowns } from './towns.js';
 import { buildLandmarks } from './landmarks.js';
 import { buildStreetLife } from './streetlife.js';
+import { buildJiufen, LANTERN_STREET } from './jiufen.js';
+import { buildValley } from './valley.js';
+import { buildMountain } from './mountain.js';
 import { CITY_Y } from '../geo.js';
 import { ROUNDABOUT } from '../city-plan.js';
 
@@ -38,6 +41,10 @@ export async function build(ctx) {
   buildCoast(kit, shared, r);
   buildRiver(kit, shared, r);
   await tick();
+  buildValley(kit, shared, r);
+  buildMountain(kit, shared, r);
+  await tick();
+  buildJiufen(kit, shared, r);
   buildTowns(shared);
   await tick();
   buildStreetLife(kit, shared, r);
@@ -46,7 +53,7 @@ export async function build(ctx) {
   // roadside furniture from the carved terrain (before the kit decorates roads in finalize)
   furnish(kit, 'yangming-road', { skip: [[0, 260]] });
   furnish(kit, 'qixing-loop', {});
-  furnish(kit, 'jiufen-road', { skip: [[0, 30], [2300, 2700]] });
+  furnish(kit, 'jiufen-road', { skip: [[0, 30], [LANTERN_STREET[0] - 40, LANTERN_STREET[1] + 10]] });
   furnish(kit, 'formosa-ring', { skip: [[0, 1180], [3000, 3360], [5440, 5760], [6420, 6960], [9950, 10560], [12080, 15170]], chevrons: true, mirrors: false });
   await tick();
   plantHills(kit, mask, r);

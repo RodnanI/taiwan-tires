@@ -15,6 +15,8 @@ export const STYLES = {
   apartment: { w: [14, 24], floors: [5, 7], qilou: 0.15, signs: 0.25, shed: 0.65, uppers: ['apt', 'apt', 'enclosed', 'laundry', 'grille', 'ac'], grounds: ['closed', 'garage', 'shop', 'gate', 'closedB', 'conv', 'blank'], tints: [0xdedbd3, 0xcfcac0, 0xd8d0c4, 0xc6c9c9, 0xe0d7c9, 0xbfc3bd] },
   commercial: { w: [8, 16], floors: [6, 12], qilou: 0.7, signs: 1.0, shed: 0.3, uppers: ['hotel', 'band', 'grid', 'enclosed', 'ac', 'twin'], grounds: ['shop', 'eatery', 'conv', 'shopB', 'shopC', 'tea', 'pharmacy', 'eatery'], tints: [0xeae6dd, 0xdcd6cc, 0xe4dccf, 0xc9ccd0, 0xd8cfc6] },
   lane: { w: [9, 18], floors: [3, 5], qilou: 0, signs: 0.3, shed: 0.6, uppers: ['apt', 'grille', 'laundry', 'enclosed', 'ac', 'balcony'], grounds: ['closed', 'garage', 'shop', 'gate', 'closedB', 'blank', 'scooterShop'], tints: [0xdedbd3, 0xe8d9d0, 0xd5dde0, 0xe9e1cc, 0xcfd1d4, 0xe2cfc0, 0xc9c3b6] },
+  // rural townhouses (透天厝): narrow, three or four storeys, tiled in pale colours, iron sheds on the roof
+  farm: { w: [5.5, 7.5], floors: [3, 4], qilou: 0, signs: 0.08, shed: 0.75, uppers: ['balcony', 'grille', 'twin', 'enclosed', 'balcony'], grounds: ['garage', 'closed', 'gate', 'closedB', 'garage'], tints: [0xf3efe6, 0xf0d9d4, 0xe8e0c8, 0xd4e0e6, 0xdce8d4, 0xf2e4c4] },
   tower: { w: [30, 48], floors: [16, 34], qilou: 0, signs: 0.1, shed: 0, uppers: ['curtain', 'band', 'fins', 'grid'], grounds: ['lobby', 'lobby', 'shopC', 'conv'], tints: [0xa9b9c4, 0x9fb0ae, 0xb7b0a2, 0xc7cdd1, 0x8fa1b0, 0xbcc6c3] },
 };
 

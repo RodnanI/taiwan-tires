@@ -35,10 +35,11 @@ export class Mask {
       }
     }
   }
+  /** Mark the cells overlapping the rectangle (the same cells idx() returns for points inside it). */
   rect(x0, z0, x1, z1) {
     const c = this.cell;
-    for (let j = Math.max(0, Math.floor((z0 - this.z0) / c)); j <= Math.min(this.nz - 1, Math.ceil((z1 - this.z0) / c)); j++)
-      for (let i = Math.max(0, Math.floor((x0 - this.x0) / c)); i <= Math.min(this.nx - 1, Math.ceil((x1 - this.x0) / c)); i++) this.occ[j * this.nx + i] = 1;
+    for (let j = Math.max(0, Math.floor((z0 - this.z0) / c)); j <= Math.min(this.nz - 1, Math.floor((z1 - this.z0) / c)); j++)
+      for (let i = Math.max(0, Math.floor((x0 - this.x0) / c)); i <= Math.min(this.nx - 1, Math.floor((x1 - this.x0) / c)); i++) this.occ[j * this.nx + i] = 1;
   }
   circle(x, z, r) {
     const c = this.cell;

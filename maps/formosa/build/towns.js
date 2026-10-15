@@ -7,7 +7,8 @@ import { lin } from './geom.js';
 
 /**
  * Shophouse row beside `roadId` from station s0 to s1 (m). side: 1 = left of the road's direction, -1 = right.
- * o: { style, setback (m from the shoulder edge), depth, floors, chunk (run length), skip: [[s0, s1]...], lit }
+ * o: { style, setback (m from the shoulder edge), depth, floors, chunk (run length), skip: [[s0, s1]...], lit,
+ *      dy (m above (+) or below (-) the road: rows stepped up or down a hillside behind the first one) }
  */
 export function townRow(shared, roadId, s0, s1, side, o = {}) {
   const { kit } = shared.city.ctx;
@@ -30,7 +31,7 @@ export function townRow(shared, roadId, s0, s1, side, o = {}) {
       if (!mask.free(px, pz)) { clear = false; break; }
     }
     if (!clear) continue;
-    const y = Math.min(a.y, b.y) - 0.05;
+    const y = Math.min(a.y, b.y) - 0.05 + (o.dy ?? 0);
     const res = streetWall(shared.city.ctx, { a: [a.x, a.z], b: [b.x, b.z], n, style: o.style ?? 'shop', y, depth, floors: o.floors, qilou: o.qilou, litChance: o.lit ?? 0.3 });
     if (!res.length) continue;
     // plinth: the lot footprint down to well below the ground

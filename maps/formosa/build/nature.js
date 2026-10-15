@@ -52,7 +52,9 @@ export function plantHills(kit, mask, r) {
     } else {
       // canopy fill on a coarser lattice
       if ((Math.round(x / step) + Math.round(z / step)) % 2 || r() > 0.42 * veg) continue;
-      kit.props.place('canopy', [px, y - 1.2, pz], r() * 6, 0.8 + r() * 0.5, y > 100 && n > 0.5 ? pick(r, CEDARS) : pick(r, GREENS));
+      // far from the roads the clumps grow bigger, so the same count covers more hillside
+      const big = near > 110 ? 1.35 + r() * 0.6 : 0.8 + r() * 0.5;
+      kit.props.place('canopy', [px, y - 1.2 * big, pz], r() * 6, big, y > 100 && n > 0.5 ? pick(r, CEDARS) : pick(r, GREENS));
       clumps++;
     }
   }
